@@ -42,3 +42,7 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# agent skills (local tooling, not part of the app)
+/.agents/
+/skills-lock.json
