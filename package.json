@@ -27,6 +27,7 @@
     "react-hot-toast": "^2.6.0",
     "recharts": "^3.8.1",
     "stripe": "^22.1.1",
+    "svix": "^1.94.0",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.13"
   },

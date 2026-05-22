@@ -1,10 +1,38 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
   const { userId } = await auth()
   const user = await currentUser()
+  const supabase = createServiceClient()
+
+  // Fetch the user's profile row (created by the Clerk webhook on sign-up)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('clerk_user_id', userId)
+    .single()
+
+  // Fetch active services linked to this profile
+  const { data: services } = await supabase
+    .from('services')
+    .select('id, name, status, started_at')
+    .eq('clerk_user_id', userId)
+    .eq('status', 'active')
+
+  // Fetch recent content items
+  const { data: contentItems } = await supabase
+    .from('content_items')
+    .select('id')
+    .eq('clerk_user_id', userId)
+
+  const activeServiceCount = services?.length ?? 0
+  const totalContent = contentItems?.length ?? 0
+
+  // Placeholder metric — replace with real data once tracked
+  const hoursReclaimed = profile?.hours_reclaimed ?? null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -33,28 +61,49 @@ export default async function DashboardPage() {
               : 'Your dashboard'}
           </h1>
           <p className="text-sm text-gray-500 mt-2 font-light">
-            Your marketing command center is being set up. More features coming soon.
+            Your marketing command center.
           </p>
         </div>
 
-        {/* Placeholder cards */}
+        {/* Stat cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-          {[
-            { label: 'Hours reclaimed', value: '—', sub: 'This month' },
-            { label: 'Content produced', value: '—', sub: 'All time' },
-            { label: 'Active services', value: '—', sub: 'Running now' },
-          ].map((card) => (
-            <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-6">
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-2">
-                {card.label}
-              </p>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{card.value}</p>
-              <p className="text-xs text-gray-400">{card.sub}</p>
-            </div>
-          ))}
+          <StatCard
+            label="Hours reclaimed"
+            value={hoursReclaimed !== null ? String(hoursReclaimed) : '—'}
+            sub="This month"
+          />
+          <StatCard
+            label="Content produced"
+            value={totalContent > 0 ? String(totalContent) : '—'}
+            sub="All time"
+          />
+          <StatCard
+            label="Active services"
+            value={activeServiceCount > 0 ? String(activeServiceCount) : '—'}
+            sub="Running now"
+          />
         </div>
 
-        {/* Coming soon grid */}
+        {/* Active services list */}
+        {services && services.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-5">
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-4">
+              Active services
+            </p>
+            <ul className="divide-y divide-gray-50">
+              {services.map((svc) => (
+                <li key={svc.id} className="py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-900">{svc.name}</span>
+                  <span className="text-[10px] font-semibold tracking-widest uppercase bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full">
+                    {svc.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Feature grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[
             { title: 'AI Toolkit', desc: 'Caption generator, email builder, ad copy, and more', soon: true },
@@ -77,6 +126,18 @@ export default async function DashboardPage() {
           ))}
         </div>
       </main>
+    </div>
+  )
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-6">
+      <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-2">
+        {label}
+      </p>
+      <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+      <p className="text-xs text-gray-400">{sub}</p>
     </div>
   )
 }
