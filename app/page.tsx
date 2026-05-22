@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { Show } from '@clerk/nextjs'
 import { UserButton } from '@clerk/nextjs'
-import { SignInButton, SignUpButton } from '@clerk/nextjs'
 
 export default function HomePage() {
   return (
@@ -13,16 +12,12 @@ export default function HomePage() {
         </span>
         <div className="flex items-center gap-4">
           <Show when="signed-out">
-            <SignInButton mode="redirect">
-              <button className="text-sm text-white/60 hover:text-white transition-colors">
-                Sign in
-              </button>
-            </SignInButton>
-            <SignUpButton mode="redirect">
-              <button className="bg-[#c8522a] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#b04623] transition-colors">
-                Get started
-              </button>
-            </SignUpButton>
+            <Link href="/sign-in" className="text-sm text-white/60 hover:text-white transition-colors">
+              Sign in
+            </Link>
+            <Link href="/sign-up" className="bg-[#c8522a] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#b04623] transition-colors">
+              Get started
+            </Link>
           </Show>
           <Show when="signed-in">
             <Link
@@ -49,11 +44,9 @@ export default function HomePage() {
         </p>
         <div className="flex items-center gap-4 flex-wrap justify-center">
           <Show when="signed-out">
-            <SignUpButton mode="redirect">
-              <button className="bg-[#c8522a] text-white font-medium px-8 py-3 rounded-xl hover:bg-[#b04623] transition-colors">
-                Start free →
-              </button>
-            </SignUpButton>
+            <Link href="/sign-up" className="bg-[#c8522a] text-white font-medium px-8 py-3 rounded-xl hover:bg-[#b04623] transition-colors">
+              Start free →
+            </Link>
           </Show>
           <Show when="signed-in">
             <Link
