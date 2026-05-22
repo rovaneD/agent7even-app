@@ -24,6 +24,10 @@ export default async function DashboardPage() {
     .eq('clerk_user_id', userId)
     .single()
 
+  if (['owner', 'admin'].includes(profile?.role)) {
+    redirect('/admin')
+  }
+
   if (!profile?.onboarding_complete) {
     redirect('/onboarding')
   }
