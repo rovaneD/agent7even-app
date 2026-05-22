@@ -1,9 +1,18 @@
-export default function BillingPage() {
-  return (
-    <div className="px-8 py-8">
-      <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">Billing</p>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Billing</h1>
-      <p className="text-gray-400 text-sm">This section is coming soon.</p>
-    </div>
-  )
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+import { createServiceClient } from '@/lib/supabase/server'
+import BillingClient from './BillingClient'
+
+export default async function BillingPage() {
+  const { userId } = await auth()
+  if (!userId) redirect('/sign-in')
+
+  const supabase = createServiceClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan, status, stripe_customer_id, stripe_subscription_id, email, company_name, full_name')
+    .eq('clerk_user_id', userId)
+    .single()
+
+  return <BillingClient profile={profile} />
 }
