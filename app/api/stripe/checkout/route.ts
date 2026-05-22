@@ -51,10 +51,12 @@ export async function POST(req: NextRequest) {
         .eq('clerk_user_id', userId)
     }
 
+    const isSubscription = plan === 'done_for_you'
+
     // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: plan === 'done_for_you' ? 'subscription' : 'payment',
+      mode: isSubscription ? 'subscription' : 'payment',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true&plan=${plan}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
@@ -62,6 +64,10 @@ export async function POST(req: NextRequest) {
         clerk_user_id: userId,
         plan,
       },
+      // Generate an invoice for one-time payments so it appears in invoice history
+      ...(!isSubscription && {
+        invoice_creation: { enabled: true },
+      }),
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
     })

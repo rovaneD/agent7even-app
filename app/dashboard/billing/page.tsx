@@ -37,6 +37,7 @@ export default async function BillingPage() {
 
   if (profile?.stripe_customer_id) {
     try {
+      // Fetch invoices (subscriptions + one-time with invoice_creation enabled)
       const invoiceList = await stripe.invoices.list({
         customer: profile.stripe_customer_id,
         limit: 10,
@@ -50,6 +51,25 @@ export default async function BillingPage() {
         invoice_pdf: inv.invoice_pdf ?? null,
         hosted_invoice_url: inv.hosted_invoice_url ?? null,
       }))
+
+      // Fallback: pull payment intents for one-time payments made before invoice_creation was enabled
+      if (invoices.length === 0) {
+        const paymentIntents = await stripe.paymentIntents.list({
+          customer: profile.stripe_customer_id,
+          limit: 10,
+        })
+        invoices = paymentIntents.data
+          .filter(pi => pi.status === 'succeeded')
+          .map(pi => ({
+            id: pi.id,
+            number: null,
+            amount_paid: pi.amount,
+            status: 'paid',
+            created: pi.created,
+            invoice_pdf: null,
+            hosted_invoice_url: null,
+          }))
+      }
 
       if (profile.stripe_subscription_id) {
         const sub = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
