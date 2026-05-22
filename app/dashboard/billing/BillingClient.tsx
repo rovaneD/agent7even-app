@@ -321,6 +321,22 @@ export default function BillingClient({
         </div>
       )}
 
+      {/* Add-ons */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">À la carte add-ons</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Add individual services — photography, SEO, social media, ads, and more — to any plan.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/services"
+          className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl hover:border-gray-400 hover:text-gray-900 transition-all whitespace-nowrap flex-shrink-0"
+        >
+          Browse services <ArrowRight size={11} />
+        </Link>
+      </div>
+
     </div>
   )
 }
