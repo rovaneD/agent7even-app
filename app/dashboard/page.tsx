@@ -1,143 +1,98 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
-import { UserButton } from '@clerk/nextjs'
-import Link from 'next/link'
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
   const { userId } = await auth()
-  const user = await currentUser()
+  if (!userId) redirect('/sign-in')
+
   const supabase = createServiceClient()
 
-  // Fetch the user's profile row (created by the Clerk webhook on sign-up)
+  // Fetch profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('clerk_user_id', userId)
     .single()
 
-  // Fetch active services linked to this profile
-  const { data: services } = await supabase
-    .from('services')
-    .select('id, name, status, started_at')
-    .eq('clerk_user_id', userId)
-    .eq('status', 'active')
-
-  // Fetch recent content items
-  const { data: contentItems } = await supabase
-    .from('content_items')
-    .select('id')
-    .eq('clerk_user_id', userId)
-
-  const activeServiceCount = services?.length ?? 0
-  const totalContent = contentItems?.length ?? 0
-
-  // Placeholder metric — replace with real data once tracked
-  const hoursReclaimed = profile?.hours_reclaimed ?? null
+  // Gate: redirect to onboarding if not complete
+  if (!profile?.onboarding_complete) {
+    redirect('/onboarding')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* Top nav */}
-      <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="font-bold text-sm tracking-wide">
+      <header className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between">
+        <span className="font-bold text-sm tracking-wide text-gray-900">
           AGENT<span className="text-[#c8522a]">7</span>EVEN
-        </Link>
-        <div className="flex items-center gap-4">
+        </span>
+        <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">
-            {user?.firstName ? `Hey, ${user.firstName}` : 'Dashboard'}
+            {profile?.company_name || profile?.full_name || 'Welcome'}
           </span>
-          <UserButton />
+          <div className="w-8 h-8 rounded-full bg-[#c8522a]/10 flex items-center justify-center">
+            <span className="text-[#c8522a] text-xs font-bold">
+              {(profile?.company_name || profile?.full_name || 'U')[0].toUpperCase()}
+            </span>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-6xl mx-auto px-8 py-10">
+
         {/* Welcome */}
         <div className="mb-10">
-          <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">
-            Welcome back
+          <p className="text-xs font-semibold tracking-widest uppercase text-[#c8522a] mb-2">
+            Dashboard
           </p>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {user?.firstName
-              ? `${user.firstName}'s dashboard`
-              : 'Your dashboard'}
+          <h1 className="text-2xl font-bold text-gray-900">
+            Welcome back{profile?.company_name ? `, ${profile.company_name}` : ''}.
           </h1>
-          <p className="text-sm text-gray-500 mt-2 font-light">
-            Your marketing command center.
+          <p className="text-gray-500 text-sm mt-1">
+            Here&apos;s what&apos;s happening with your business.
           </p>
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-          <StatCard
-            label="Hours reclaimed"
-            value={hoursReclaimed !== null ? String(hoursReclaimed) : '—'}
-            sub="This month"
-          />
-          <StatCard
-            label="Content produced"
-            value={totalContent > 0 ? String(totalContent) : '—'}
-            sub="All time"
-          />
-          <StatCard
-            label="Active services"
-            value={activeServiceCount > 0 ? String(activeServiceCount) : '—'}
-            sub="Running now"
-          />
-        </div>
-
-        {/* Active services list */}
-        {services && services.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-5">
-            <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-4">
-              Active services
-            </p>
-            <ul className="divide-y divide-gray-50">
-              {services.map((svc) => (
-                <li key={svc.id} className="py-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900">{svc.name}</span>
-                  <span className="text-[10px] font-semibold tracking-widest uppercase bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full">
-                    {svc.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Feature grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Value scorecard */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { title: 'AI Toolkit', desc: 'Caption generator, email builder, ad copy, and more', soon: true },
-            { title: 'Services & Orders', desc: 'Request and track managed marketing services', soon: true },
-            { title: 'Analytics', desc: 'Social, website, and email performance in one view', soon: true },
-            { title: 'Templates & Resources', desc: 'Downloadable content calendars, SOPs, and brand kits', soon: true },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="bg-white rounded-2xl border border-gray-100 p-6 relative overflow-hidden"
-            >
-              {item.soon && (
-                <span className="absolute top-4 right-4 text-[9px] font-semibold tracking-widest uppercase bg-gray-100 text-gray-400 px-2 py-1 rounded-full">
-                  Coming soon
-                </span>
-              )}
-              <h3 className="text-sm font-bold text-gray-900 mb-1">{item.title}</h3>
-              <p className="text-xs text-gray-500 font-light leading-relaxed">{item.desc}</p>
+            { label: 'Hours reclaimed', value: '—', sub: 'This month', color: 'text-[#c8522a]' },
+            { label: 'Content produced', value: '—', sub: 'Total pieces', color: 'text-blue-500' },
+            { label: 'Active services', value: '—', sub: 'Running now', color: 'text-green-500' },
+          ].map((card) => (
+            <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-6">
+              <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-3">
+                {card.label}
+              </p>
+              <p className={`text-3xl font-bold ${card.color} mb-1`}>{card.value}</p>
+              <p className="text-xs text-gray-400">{card.sub}</p>
             </div>
           ))}
         </div>
-      </main>
-    </div>
-  )
-}
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6">
-      <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-2">
-        {label}
-      </p>
-      <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
-      <p className="text-xs text-gray-400">{sub}</p>
+        {/* Empty state — services */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-[#c8522a]/10 flex items-center justify-center mx-auto mb-4">
+            <span className="text-[#c8522a] text-lg">⚡</span>
+          </div>
+          <h2 className="text-base font-semibold text-gray-900 mb-2">
+            Your workspace is ready
+          </h2>
+          <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
+            Services, AI tools, analytics, and more are on the way.
+            Your account is active and your team has been notified.
+          </p>
+          <a
+            href="https://agent7even.com/#pricing"
+            className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-[#b04623] transition-colors"
+          >
+            Explore services →
+          </a>
+        </div>
+
+      </main>
     </div>
   )
 }
