@@ -110,16 +110,15 @@ RESEND_API_KEY                       re_...
 STRIPE_SECRET_KEY                    sk_test_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY   pk_test_...
 STRIPE_WEBHOOK_SECRET                whsec_...
-STRIPE_AI_SPRINT_PRICE_ID            price_1TZk47CjXyyqncdvyQIqOE9X  # DEPRECATED — being replaced
-STRIPE_GROWTH_PRICE_ID               price_1TZk4rCjXyyqncdv4YPex6H8  # DEPRECATED — being replaced
-STRIPE_DONE_FOR_YOU_PRICE_ID         price_1TZk5UCjXyyqncdvwUusrLxb  # DEPRECATED — being replaced
-# New price IDs (6 total) to be added after Stripe products are recreated:
-# STRIPE_STARTER_MONTHLY_PRICE_ID
-# STRIPE_STARTER_ANNUAL_PRICE_ID
-# STRIPE_GROWTH_MONTHLY_PRICE_ID
-# STRIPE_GROWTH_ANNUAL_PRICE_ID
-# STRIPE_PROAGENT_MONTHLY_PRICE_ID
-# STRIPE_PROAGENT_ANNUAL_PRICE_ID
+STRIPE_AI_SPRINT_PRICE_ID            price_1TZk47CjXyyqncdvyQIqOE9X  # DEPRECATED — kept in place, not referenced
+STRIPE_GROWTH_PRICE_ID               price_1TZk4rCjXyyqncdv4YPex6H8  # DEPRECATED
+STRIPE_DONE_FOR_YOU_PRICE_ID         price_1TZk5UCjXyyqncdvwUusrLxb  # DEPRECATED
+STRIPE_STARTER_MONTHLY_PRICE_ID      price_1TaGc5CjXyyqncdvNQJwQHs4
+STRIPE_STARTER_ANNUAL_PRICE_ID       price_1TaGc5CjXyyqncdvmNsCBXGw
+STRIPE_GROWTH_MONTHLY_PRICE_ID       price_1TaGdnCjXyyqncdvG1VU9B20
+STRIPE_GROWTH_ANNUAL_PRICE_ID        price_1TaGdnCjXyyqncdvX6OZesUh
+STRIPE_PROAGENT_MONTHLY_PRICE_ID     price_1TaGfiCjXyyqncdvubhiuZOh
+STRIPE_PROAGENT_ANNUAL_PRICE_ID      price_1TaGfiCjXyyqncdv4kAP523z
 ANTHROPIC_API_KEY                    sk-ant-...
 GOOGLE_OAUTH_CLIENT_ID               98873543191-tr84f...
 GOOGLE_OAUTH_CLIENT_SECRET           GOCSPX-...
