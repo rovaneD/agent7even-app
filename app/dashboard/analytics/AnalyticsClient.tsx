@@ -70,26 +70,54 @@ function fmt(n: number) {
   return `${n}`
 }
 
+function BrandIcon({
+  src,
+  alt,
+  dark,
+}: {
+  src: string
+  alt: string
+  dark?: boolean
+}) {
+  return (
+    <div
+      className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${
+        dark ? 'bg-[#0a0a0a]' : 'bg-gray-50'
+      }`}
+    >
+      <img src={src} alt={alt} className="w-5 h-5 object-contain" />
+    </div>
+  )
+}
+
 function StatCard({
   label,
   value,
   delta,
   icon: Icon,
+  logoSrc,
+  logoDark,
   locked,
 }: {
   label: string
   value: string
   delta?: number
   icon: React.ElementType
+  logoSrc?: string
+  logoDark?: boolean
   locked?: boolean
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
-        <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center">
-          <Icon size={15} className="text-gray-400" />
-        </div>
+        {logoSrc ? (
+          <BrandIcon src={logoSrc} alt={label} dark={logoDark} />
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center">
+            <Icon size={15} className="text-gray-400" />
+          </div>
+        )}
       </div>
       {locked ? (
         <div className="flex items-center gap-2">
@@ -144,6 +172,8 @@ function LockedSection({
   description,
   tooltip,
   icon: Icon,
+  logoSrc,
+  logoDark,
   connectLabel,
   connectHref,
 }: {
@@ -151,6 +181,8 @@ function LockedSection({
   description: string
   tooltip: string
   icon: React.ElementType
+  logoSrc?: string
+  logoDark?: boolean
   connectLabel: string
   connectHref: string
 }) {
@@ -158,9 +190,13 @@ function LockedSection({
     <div className="bg-white rounded-2xl border border-gray-100">
       <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center">
-            <Icon size={16} className="text-gray-400" />
-          </div>
+          {logoSrc ? (
+            <BrandIcon src={logoSrc} alt={title} dark={logoDark} />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center">
+              <Icon size={16} className="text-gray-400" />
+            </div>
+          )}
           <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
           <InfoTooltip text={tooltip} />
         </div>
@@ -216,7 +252,7 @@ export default function AnalyticsClient({ companyName }: Props) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+    <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -246,11 +282,11 @@ export default function AnalyticsClient({ companyName }: Props) {
       </div>
 
       {/* Stat cards row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Website sessions" value="—" icon={Globe} locked />
-        <StatCard label="Instagram followers" value="—" icon={Hash} locked />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Website sessions" value="—" icon={Globe} logoSrc="/_google_analytics_icon.png" locked />
+        <StatCard label="Instagram followers" value="—" icon={Hash} logoSrc="/instagram-logo.png" locked />
         <StatCard label="Total reach" value="—" icon={Eye} locked />
-        <StatCard label="Ad clicks" value="—" icon={MousePointerClick} locked />
+        <StatCard label="Ad clicks" value="—" icon={MousePointerClick} logoSrc="/MetaLogo.png" logoDark locked />
       </div>
 
       {/* Notice banner */}
@@ -270,6 +306,7 @@ export default function AnalyticsClient({ companyName }: Props) {
         description="Connect Google Analytics to track sessions, users, and pageviews."
         tooltip="To connect, go to analytics.google.com, create a property for your website, then share View access with your Agent7even team or paste your Measurement ID into your site settings. We'll wire it up for you."
         icon={Globe}
+        logoSrc="/_google_analytics_icon.png"
         connectLabel="Connect Google Analytics"
         connectHref="https://analytics.google.com"
       />
@@ -280,6 +317,7 @@ export default function AnalyticsClient({ companyName }: Props) {
         description="Connect Instagram to track followers, reach, and impressions."
         tooltip="To connect, your Instagram must be a Business or Creator account linked to a Facebook Page. Go to instagram.com → Settings → Account → Switch to Professional Account. Then share access with your Agent7even team via Meta Business Suite."
         icon={Hash}
+        logoSrc="/instagram-logo.png"
         connectLabel="Connect Instagram"
         connectHref="https://www.instagram.com/accounts/convert_to_business/"
       />
@@ -290,6 +328,8 @@ export default function AnalyticsClient({ companyName }: Props) {
         description="Connect Meta Ads to track spend, clicks, and conversions."
         tooltip="To connect, go to Meta Business Suite → Settings → People, and add your Agent7even team as a Partner with Advertiser access to your Ad Account. This lets us pull spend, clicks, and conversion data into your dashboard."
         icon={MousePointerClick}
+        logoSrc="/MetaLogo.png"
+        logoDark
         connectLabel="Connect Meta Ads"
         connectHref="https://business.facebook.com/settings"
       />
