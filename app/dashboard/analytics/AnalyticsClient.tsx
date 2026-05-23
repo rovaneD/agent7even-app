@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
@@ -8,7 +8,7 @@ import {
 import {
   Globe, Hash, Info, Eye, MousePointerClick,
   Lock, Calendar, ArrowUpRight, ArrowDownRight,
-  X, CheckCircle, Clock,
+  X, CheckCircle, Clock, Wifi, WifiOff, RefreshCw,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -181,9 +181,9 @@ const PLATFORM_CONFIG: Record<Platform, {
 }> = {
   google_analytics: {
     label: 'Google Analytics',
-    fieldLabel: 'Measurement ID',
-    placeholder: 'G-XXXXXXXXXX',
-    hint: 'Find this in Google Analytics → Admin → Data Streams → your stream → Measurement ID.',
+    fieldLabel: 'GA4 Property ID',
+    placeholder: '123456789',
+    hint: 'Find this in Google Analytics → Admin → Property Settings → Property ID (the numeric ID at the top, not the G-... tracking code).',
   },
   instagram: {
     label: 'Instagram',
@@ -375,6 +375,226 @@ function LockedSection({
   )
 }
 
+// ── Live GA section ───────────────────────────────────────────────────────────
+
+type GaStatus = 'loading' | 'connected' | 'pending' | 'error'
+
+interface GaData {
+  chartData: { day: string; sessions: number; users: number }[]
+  summary: { sessions: number; users: number; pageviews: number; bounceRate: string }
+}
+
+function WebsiteAnalyticsSection({
+  propertyId,
+  range,
+  tooltip,
+  onConnect,
+  onSessionsLoaded,
+}: {
+  propertyId: string | null
+  range: Range
+  tooltip: string
+  onConnect: (p: Platform) => void
+  onSessionsLoaded: (n: number | null) => void
+}) {
+  const [status, setStatus] = useState<GaStatus>('loading')
+  const [data, setData] = useState<GaData | null>(null)
+
+  const fetchData = useCallback(async () => {
+    if (!propertyId) { setStatus('pending'); onSessionsLoaded(null); return }
+    setStatus('loading')
+    try {
+      const res = await fetch(`/api/analytics/ga-data?range=${range}`)
+      const json = await res.json()
+      if (json.connected) {
+        setData(json)
+        setStatus('connected')
+        onSessionsLoaded(json.summary.sessions)
+      } else {
+        setStatus('pending')
+        onSessionsLoaded(null)
+      }
+    } catch {
+      setStatus('error')
+      onSessionsLoaded(null)
+    }
+  }, [propertyId, range, onSessionsLoaded])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  const SA_EMAIL = process.env.NEXT_PUBLIC_GOOGLE_SA_CLIENT_EMAIL ?? 'analytics@agent7even.iam.gserviceaccount.com'
+
+  if (!propertyId) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100">
+        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
+          <div className="flex items-center gap-3">
+            <BrandIcon src="/google_analytics_icon.png" alt="Google Analytics" />
+            <h3 className="text-sm font-semibold text-gray-700">Website Analytics</h3>
+            <InfoTooltip text={tooltip} />
+          </div>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
+            <Lock size={11} /> Not connected
+          </span>
+        </div>
+        <div className="relative px-6 pt-6 pb-2 select-none pointer-events-none" aria-hidden="true">
+          <div className="blur-sm opacity-30">
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={websiteData7d} barSize={14}>
+                <Bar dataKey="sessions" fill="#c8522a" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/60">
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-800 mb-1">Connect Google Analytics to track sessions, users, and pageviews.</p>
+              <p className="text-xs text-gray-400">Connect your account to see live data here.</p>
+            </div>
+            <button
+              onClick={() => onConnect('google_analytics')}
+              className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-[#b8471f] transition-colors pointer-events-auto"
+            >
+              Connect Google Analytics
+            </button>
+          </div>
+        </div>
+        <div className="h-16 rounded-b-2xl overflow-hidden" />
+      </div>
+    )
+  }
+
+  if (status === 'loading') {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100">
+        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BrandIcon src="/google_analytics_icon.png" alt="Google Analytics" />
+            <h3 className="text-sm font-semibold text-gray-700">Website Analytics</h3>
+            <InfoTooltip text={tooltip} />
+          </div>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">
+            <RefreshCw size={11} className="animate-spin" /> Loading…
+          </span>
+        </div>
+        <div className="h-48 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#c8522a] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'connected' && data) {
+    const chartData = data.chartData.map(d => ({
+      ...d,
+      day: d.day.length === 8
+        ? `${d.day.slice(4, 6)}/${d.day.slice(6, 8)}`
+        : d.day,
+    }))
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100">
+        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BrandIcon src="/google_analytics_icon.png" alt="Google Analytics" />
+            <h3 className="text-sm font-semibold text-gray-700">Website Analytics</h3>
+            <InfoTooltip text={tooltip} />
+          </div>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+            <Wifi size={11} /> Connected
+          </span>
+        </div>
+
+        {/* Summary stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border-b border-gray-100">
+          {[
+            { label: 'Sessions', value: fmt(data.summary.sessions) },
+            { label: 'Users', value: fmt(data.summary.users) },
+            { label: 'Pageviews', value: fmt(data.summary.pageviews) },
+            { label: 'Bounce rate', value: `${data.summary.bounceRate}%` },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white px-5 py-3">
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+              <p className="text-lg font-semibold text-gray-900 mt-0.5">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Live chart */}
+        <div className="px-4 pt-5 pb-3">
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={32} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #f0f0f0' }} />
+              <Line type="monotone" dataKey="sessions" stroke="#c8522a" strokeWidth={2} dot={false} name="Sessions" />
+              <Line type="monotone" dataKey="users" stroke="#e8a87c" strokeWidth={2} dot={false} name="Users" />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-4 mt-1 px-1">
+            <span className="flex items-center gap-1.5 text-[10px] text-gray-400"><span className="w-3 h-0.5 bg-[#c8522a] inline-block rounded" />Sessions</span>
+            <span className="flex items-center gap-1.5 text-[10px] text-gray-400"><span className="w-3 h-0.5 bg-[#e8a87c] inline-block rounded" />Users</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Pending — property ID saved but service account not yet granted access
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100">
+      <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
+        <div className="flex items-center gap-3">
+          <BrandIcon src="/google_analytics_icon.png" alt="Google Analytics" />
+          <h3 className="text-sm font-semibold text-gray-700">Website Analytics</h3>
+          <InfoTooltip text={tooltip} />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchData}
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            title="Retry connection"
+          >
+            <RefreshCw size={11} className="text-gray-400" />
+          </button>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">
+            <Clock size={11} /> Pending
+          </span>
+        </div>
+      </div>
+
+      <div className="relative px-6 pt-6 pb-2 select-none pointer-events-none" aria-hidden="true">
+        <div className="blur-sm opacity-20">
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={websiteData7d} barSize={14}>
+              <Bar dataKey="sessions" fill="#c8522a" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/70 px-6">
+          <CheckCircle size={20} className="text-amber-500" />
+          <div className="text-center">
+            <p className="text-sm font-semibold text-gray-800 mb-1">One more step to go live</p>
+            <p className="text-xs text-gray-500 leading-relaxed max-w-sm">
+              In Google Analytics, go to <strong>Admin → Property Access Management</strong> and add:
+            </p>
+            <code className="block mt-2 text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg font-mono pointer-events-auto select-text">
+              {SA_EMAIL}
+            </code>
+            <p className="text-xs text-gray-400 mt-2">Set the role to <strong>Viewer</strong>. Data will appear here within a few minutes.</p>
+          </div>
+          <button
+            onClick={() => onConnect('google_analytics')}
+            className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600 pointer-events-auto"
+          >
+            Update property ID
+          </button>
+        </div>
+      </div>
+      <div className="h-16 rounded-b-2xl overflow-hidden" />
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnalyticsClient({
@@ -385,20 +605,11 @@ export default function AnalyticsClient({
 }: Props) {
   const [range, setRange] = useState<Range>('7d')
   const [activePlatform, setActivePlatform] = useState<Platform | null>(null)
+  const [liveSessions, setLiveSessions] = useState<number | null>(null)
 
-  // Local optimistic state so UI updates immediately after modal submit
   const [gaId, setGaId] = useState(gaMeasurementId)
   const [igHandle, setIgHandle] = useState(instagramHandle)
   const [metaId, setMetaId] = useState(metaAdAccountId)
-
-  const websiteData =
-    range === '7d' ? websiteData7d : range === '30d' ? websiteData30d : websiteData90d
-
-  const rangeLabel: Record<Range, string> = {
-    '7d': 'Last 7 days',
-    '30d': 'Last 30 days',
-    '90d': 'Last 90 days',
-  }
 
   const handleSuccess = (platform: Platform, value: string) => {
     if (platform === 'google_analytics') setGaId(value)
@@ -452,34 +663,38 @@ export default function AnalyticsClient({
 
       {/* Stat cards row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Website sessions" value="—" icon={Globe} logoSrc="/google_analytics_icon.png" locked />
+        <StatCard
+          label="Website sessions"
+          value={liveSessions !== null ? fmt(liveSessions) : '—'}
+          icon={Globe}
+          logoSrc="/google_analytics_icon.png"
+          locked={liveSessions === null}
+        />
         <StatCard label="Instagram followers" value="—" icon={Hash} logoSrc="/instagram-logo.png" locked />
         <StatCard label="Total reach" value="—" icon={Eye} locked />
         <StatCard label="Ad clicks" value="—" icon={MousePointerClick} logoSrc="/MetaLogo.png" locked />
       </div>
 
-      {/* Notice banner */}
-      <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-        <Calendar size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-amber-700 leading-relaxed">
-          <span className="font-semibold">          Live analytics are coming.</span>{' '}
-          Connect your Google Analytics, Instagram, and Meta Ads accounts below to start seeing real data.
-          Your Agent7even team can also help with setup —{' '}
-          <a href="/dashboard/support" className="font-semibold underline underline-offset-2 hover:text-amber-900 transition-colors">reach out via Support</a>.
-        </p>
-      </div>
+      {/* Notice banner — hide when GA is connected */}
+      {liveSessions === null && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+          <Calendar size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-amber-700 leading-relaxed">
+            <span className="font-semibold">Live analytics are coming.</span>{' '}
+            Connect your Google Analytics, Instagram, and Meta Ads accounts below to start seeing real data.
+            Your Agent7even team can also help with setup —{' '}
+            <a href="/dashboard/support" className="font-semibold underline underline-offset-2 hover:text-amber-900 transition-colors">reach out via Support</a>.
+          </p>
+        </div>
+      )}
 
-      {/* Website Analytics */}
-      <LockedSection
-        title="Website Analytics"
-        description="Connect Google Analytics to track sessions, users, and pageviews."
-        tooltip="To connect, go to analytics.google.com, create a property for your website, then share View access with your Agent7even team or paste your Measurement ID into your site settings. We'll wire it up for you."
-        icon={Globe}
-        logoSrc="/google_analytics_icon.png"
-        connectLabel="Connect Google Analytics"
-        platform="google_analytics"
-        pendingValue={gaId}
+      {/* Website Analytics — live when connected */}
+      <WebsiteAnalyticsSection
+        propertyId={gaId}
+        range={range}
+        tooltip="To connect: enter your GA4 Property ID (numeric, found in Google Analytics → Admin → Property Settings). Then add our service account as a Viewer in GA4 → Admin → Property Access Management."
         onConnect={setActivePlatform}
+        onSessionsLoaded={setLiveSessions}
       />
 
       {/* Social Media */}
