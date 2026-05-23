@@ -60,6 +60,15 @@ The marketing site (`agent7even.com`) links directly to the app for auth actions
 
 No changes are needed on the app side. These are simple `href` updates on the marketing site (`~/agent7even`) only.
 
+### Google OAuth (Analytics)
+- GCP Project: `agent7even-analytics` (project number `98873543191`)
+- OAuth 2.0 Client ID: `98873543191-tr84f0b2218cac6u7e9v95sfpogohmie.apps.googleusercontent.com`
+- Authorized redirect URI: `https://app.agent7even.com/api/analytics/ga-callback`
+- Scope requested: `https://www.googleapis.com/auth/analytics.readonly`
+- APIs enabled in GCP: **Google Analytics Data API** + **Google Analytics Admin API**
+- Service account: `agent7even-analytics@agent7even-analytics.iam.gserviceaccount.com`
+- OAuth consent screen: External, published (in review for Google verification)
+
 ### Vercel Environment Variables (all set in production)
 ```
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY    pk_live_...
@@ -82,6 +91,11 @@ STRIPE_AI_SPRINT_PRICE_ID            price_1TZk47CjXyyqncdvyQIqOE9X
 STRIPE_GROWTH_PRICE_ID               price_1TZk4rCjXyyqncdv4YPex6H8
 STRIPE_DONE_FOR_YOU_PRICE_ID         price_1TZk5UCjXyyqncdvwUusrLxb
 ANTHROPIC_API_KEY                    sk-ant-...
+GOOGLE_OAUTH_CLIENT_ID               98873543191-tr84f...
+GOOGLE_OAUTH_CLIENT_SECRET           GOCSPX-...
+GOOGLE_SA_CLIENT_EMAIL               agent7even-analytics@agent7even-analytics.iam.gserviceaccount.com
+GOOGLE_SA_PRIVATE_KEY                -----BEGIN PRIVATE KEY-----...
+NEXT_PUBLIC_GOOGLE_SA_CLIENT_EMAIL   agent7even-analytics@agent7even-analytics.iam.gserviceaccount.com
 ```
 
 ---
@@ -91,14 +105,16 @@ ANTHROPIC_API_KEY                    sk-ant-...
 ```
 app/
   layout.tsx                              # ClerkProvider, Geist font, global styles
-  page.tsx                                # Homepage/landing (dark, on-brand)
+  page.tsx                                # Homepage/landing (dark, on-brand) + footer
   globals.css                             # Tailwind v4 + tailwindcss-animate
-  sign-in/[[...sign-in]]/page.tsx
-  sign-up/[[...sign-up]]/page.tsx
+  privacy/page.tsx                        # Privacy Policy (public, no auth)
+  terms/page.tsx                          # Terms of Service (public, no auth)
+  sign-in/[[...sign-in]]/page.tsx         # + Privacy/Terms links below Clerk component
+  sign-up/[[...sign-up]]/page.tsx         # + Privacy/Terms links below Clerk component
   onboarding/page.tsx                     # Conversational onboarding (client component)
   pricing/page.tsx                        # Pricing page with 3 plans + Stripe checkout
   dashboard/
-    layout.tsx                            # Sidebar nav layout (client component)
+    layout.tsx                            # Sidebar nav layout — Privacy/Terms in sidebar bottom
     page.tsx                              # Dashboard home — redirects admin→/admin, ungated→/onboarding
     services/
       page.tsx                            # Server: fetches profile + orders
@@ -109,7 +125,9 @@ app/
     billing/
       page.tsx                            # Server: fetches Stripe invoices + subscription
       BillingClient.tsx                   # Client: plan card, invoices, portal, upgrade
-    analytics/page.tsx                    # Placeholder
+    analytics/
+      page.tsx                            # Server: fetches GA + social connection state from profiles
+      AnalyticsClient.tsx                 # Client: GA OAuth flow, property selector, live charts
     deliverables/page.tsx                 # Placeholder
     support/page.tsx                      # Placeholder
     settings/page.tsx                     # Placeholder
@@ -140,6 +158,16 @@ app/
     admin/
       notes/route.ts                      # Creates admin_notes row
       orders/update-status/route.ts       # Updates order status + emails client on "delivered"
+    analytics/
+      ga-connect/route.ts                 # Redirects to Google OAuth consent screen
+      ga-callback/route.ts                # Exchanges OAuth code → stores refresh token + email
+      ga-properties/route.ts              # Lists user's GA4 properties via accountSummaries API
+      ga-data/route.ts                    # Fetches GA4 report data (OAuth first, SA fallback)
+      connect/route.ts                    # Saves GA property ID / Instagram / Meta IDs to profiles
+      disconnect/route.ts                 # Clears all GA OAuth tokens + property ID from profiles
+    ai/
+      run-prompt/route.ts                 # Runs Claude generation, logs to ai_tool_usage
+      save-prompt/route.ts                # Saves prompt to saved_prompts
 
 lib/
   supabase/
@@ -147,7 +175,8 @@ lib/
     client.ts                             # Browser Supabase client
   requireAdmin.ts                         # Checks role = 'admin'|'owner', redirects otherwise
 
-proxy.ts                                  # Clerk middleware — public routes: /, /sign-in, /sign-up, /pricing, /api/webhooks/*
+proxy.ts                                  # Clerk middleware — public: /, /sign-in, /sign-up, /pricing,
+                                          #   /privacy, /terms, /api/webhooks/*, /api/analytics/ga-callback
 ```
 
 ---
@@ -172,7 +201,12 @@ proxy.ts                                  # Clerk middleware — public routes: 
 | `business_type` | text | Set during onboarding |
 | `business_goals` | text[] | Multi-select from onboarding |
 | `website_url` | text | |
-| `instagram_handle` | text | |
+| `instagram_handle` | text | Set via Analytics connect modal |
+| `ga_measurement_id` | text | GA4 Property ID (numeric, not G-...) — set after OAuth property selection |
+| `meta_ad_account_id` | text | Meta Ads account ID |
+| `ga_refresh_token` | text | Google OAuth refresh token — stored after OAuth flow |
+| `ga_oauth_email` | text | Google account email used for OAuth |
+| `ga_connected` | boolean | True once OAuth + property both confirmed |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
@@ -274,12 +308,12 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 
 ## What's Fully Built and Live
 
-- [x] Homepage with sign-in/sign-up CTAs
+- [x] Homepage with sign-in/sign-up CTAs + footer
 - [x] Clerk auth (production instance, custom domain DNS)
 - [x] Clerk webhook → Supabase `profiles` sync
 - [x] Conversational onboarding (5 steps, typing animation)
 - [x] Dashboard gated behind onboarding
-- [x] Dashboard sidebar layout with 8 nav items
+- [x] Dashboard sidebar layout with 8 nav items + Privacy/Terms links
 - [x] **Stripe billing** — pricing page, checkout, customer portal, invoice history, upgrade cards
 - [x] **Services module** — browse 8 services, request modal, orders tracking, admin email notification
 - [x] **AI Toolkit** — 8 seeded prompts, variable system, Claude generation, copy/save, usage tracking
@@ -287,6 +321,9 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 - [x] **Admin panel** — command center, clients table, client detail, order status updater, internal notes
 - [x] Admin auto-redirect on login (role = owner/admin → /admin)
 - [x] Order delivered → client email via Resend
+- [x] **Analytics tab** — Google Analytics OAuth self-serve flow (connect, property selector, live chart), Instagram + Meta pending placeholders, disconnect/reset
+- [x] **Privacy Policy** (`/privacy`) and **Terms of Service** (`/terms`) — public pages, no auth required
+- [x] Legal links on sign-in, sign-up, homepage, dashboard sidebar, and marketing site footer
 
 ---
 
@@ -296,10 +333,10 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 - Welcome email on `user.created` webhook (currently missing)
 - The order notification and delivery emails are wired but the welcome flow isn't
 
-### 2. Analytics tab — HIGH
-- Connect Google Analytics / Meta Pixel / Instagram Basic Display API
-- Show followers, reach, website traffic in the dashboard
-- Currently placeholder page
+### 2. Analytics tab — Instagram + Meta — MEDIUM
+- Instagram and Meta Ads sections are placeholders (pending connection only)
+- Instagram needs Meta Business API access (user grants via Meta Business Suite)
+- Meta Ads needs Meta Marketing API (Ads Insights API) with the user's ad account ID
 
 ### 3. Deliverables tab — MEDIUM
 - Admin uploads files (PDFs, brand guides, images) per client
@@ -319,11 +356,16 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 - Client can update `company_name`, `website_url`, `instagram_handle`
 - At `/dashboard/settings`
 
-### 7. Marketing site auth links — WHEN READY
+### 7. Google OAuth verification — PENDING
+- App submitted for verification with Google (analytics.readonly scope)
+- Until verified, users see "unverified app" warning but can still proceed
+- Privacy Policy URL: `https://app.agent7even.com/privacy`
+
+### 8. Marketing site auth links — WHEN READY
 - Update sign up and log in CTAs on `agent7even.com` to point to `app.agent7even.com/sign-up` and `app.agent7even.com/sign-in`
 - Changes are in `~/agent7even/src/components/` (Nav.tsx, Hero.tsx, CTA.tsx) — simple `href` swaps only
 
-### 8. Go live on Stripe — WHEN READY
+### 9. Go live on Stripe — WHEN READY
 - Switch from test keys (`sk_test_`, `pk_test_`) to live keys (`sk_live_`, `pk_live_`)
 - Recreate the 3 products/prices in Stripe live mode → get new `price_` IDs
 - Update all 6 Stripe env vars in Vercel
