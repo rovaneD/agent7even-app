@@ -452,10 +452,10 @@ export default function AnalyticsClient({
 
       {/* Stat cards row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Website sessions" value="—" icon={Globe} logoSrc="/_google_analytics_icon.png" locked />
+        <StatCard label="Website sessions" value="—" icon={Globe} logoSrc="/google_analytics_icon.png" locked />
         <StatCard label="Instagram followers" value="—" icon={Hash} logoSrc="/instagram-logo.png" locked />
         <StatCard label="Total reach" value="—" icon={Eye} locked />
-        <StatCard label="Ad clicks" value="—" icon={MousePointerClick} logoSrc="/MetaLogo.png" logoDark locked />
+        <StatCard label="Ad clicks" value="—" icon={MousePointerClick} logoSrc="/MetaLogo.png" locked />
       </div>
 
       {/* Notice banner */}
@@ -475,7 +475,7 @@ export default function AnalyticsClient({
         description="Connect Google Analytics to track sessions, users, and pageviews."
         tooltip="To connect, go to analytics.google.com, create a property for your website, then share View access with your Agent7even team or paste your Measurement ID into your site settings. We'll wire it up for you."
         icon={Globe}
-        logoSrc="/_google_analytics_icon.png"
+        logoSrc="/google_analytics_icon.png"
         connectLabel="Connect Google Analytics"
         platform="google_analytics"
         pendingValue={gaId}
@@ -502,7 +502,6 @@ export default function AnalyticsClient({
         tooltip="To connect, go to Meta Business Suite → Settings → People, and add your Agent7even team as a Partner with Advertiser access to your Ad Account. This lets us pull spend, clicks, and conversion data into your dashboard."
         icon={MousePointerClick}
         logoSrc="/MetaLogo.png"
-        logoDark
         connectLabel="Connect Meta Ads"
         platform="meta"
         pendingValue={metaId}
