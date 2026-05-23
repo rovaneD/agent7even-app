@@ -6,7 +6,7 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts'
 import {
-  Globe, TrendingUp, Users, Eye, MousePointerClick,
+  Globe, Hash, TrendingUp, Users, Eye, MousePointerClick,
   Lock, ExternalLink, Calendar, ArrowUpRight, ArrowDownRight
 } from 'lucide-react'
 
@@ -221,7 +221,7 @@ export default function AnalyticsClient({ companyName }: Props) {
       {/* Stat cards row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Website sessions" value="—" icon={Globe} locked />
-        <StatCard label="Instagram followers" value="—" icon={Users} locked />
+        <StatCard label="Instagram followers" value="—" icon={Hash} locked />
         <StatCard label="Total reach" value="—" icon={Eye} locked />
         <StatCard label="Ad clicks" value="—" icon={MousePointerClick} locked />
       </div>
@@ -249,7 +249,7 @@ export default function AnalyticsClient({ companyName }: Props) {
       <LockedSection
         title="Social Media"
         description="Connect Instagram to track followers, reach, and impressions."
-        icon={TrendingUp}
+        icon={Hash}
         connectLabel="Connect Instagram"
         connectHref="https://www.instagram.com"
       />
