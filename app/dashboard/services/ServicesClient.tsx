@@ -227,17 +227,17 @@ export default function ServicesClient({
   const completedOrders = orders.filter(o => ['approved', 'cancelled'].includes(o.status))
 
   return (
-    <div className="px-8 py-8 max-w-5xl">
+    <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-5xl">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">Services</p>
           <h1 className="text-2xl font-bold text-gray-900">Marketing services</h1>
           <p className="text-gray-500 text-sm mt-1">Request a service or track your active orders.</p>
         </div>
         {orders.length > 0 && (
-          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
             {(['browse', 'orders'] as const).map(tab => (
               <button
                 key={tab}
@@ -265,7 +265,7 @@ export default function ServicesClient({
 
       {/* Browse tab */}
       {activeTab === 'browse' && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {SERVICES.map(service => {
             const Icon = service.icon
             const hasActiveOrder = orders.some(
@@ -276,17 +276,17 @@ export default function ServicesClient({
                 key={service.id}
                 className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center">
+                <div className="flex items-start justify-between mb-4 gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
                       <Icon size={16} className="text-gray-500" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{service.name}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 leading-snug">{service.name}</p>
                       <p className="text-xs text-[#c8522a] font-medium">{service.price}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full ${
+                  <span className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full ${
                     service.type === 'retainer'
                       ? 'bg-purple-50 text-purple-500'
                       : 'bg-blue-50 text-blue-500'
@@ -386,22 +386,22 @@ function OrderCard({ order }: { order: Order }) {
   const ServiceIcon = service?.icon ?? Globe
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center justify-between hover:border-gray-200 transition-all">
-      <div className="flex items-center gap-4">
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 flex items-center justify-between gap-3 hover:border-gray-200 transition-all">
+      <div className="flex items-center gap-3 min-w-0">
         <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
           <ServiceIcon size={16} className="text-gray-400" />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">{order.title}</p>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">{order.title}</p>
           <p className="text-xs text-gray-400 mt-0.5">
             Submitted {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${status.color}`}>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full ${status.color}`}>
           <StatusIcon size={11} />
-          {status.label}
+          <span className="hidden sm:inline">{status.label}</span>
         </span>
         <ChevronRight size={14} className="text-gray-300" />
       </div>

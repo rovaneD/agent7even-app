@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-5xl">
+    <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-5xl">
       <div className="mb-8">
         <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">Dashboard</p>
         <h1 className="text-2xl font-bold text-gray-900">Welcome back, {displayName}.</h1>
@@ -50,20 +50,20 @@ export default async function DashboardPage() {
       </div>
 
       {!hasPlan && (
-        <div className="bg-[#0d0d0d] rounded-2xl p-6 mb-6 flex items-center justify-between">
+        <div className="bg-[#0d0d0d] rounded-2xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
           <div>
             <p className="text-white font-semibold text-sm mb-1">You don&apos;t have an active plan yet</p>
             <p className="text-gray-500 text-xs">Choose a plan to unlock your full workspace.</p>
           </div>
-          <Link href="/pricing" className="flex-shrink-0 bg-[#c8522a] text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-[#b04623] transition-colors flex items-center gap-2">
+          <Link href="/pricing" className="sm:ml-auto flex-shrink-0 bg-[#c8522a] text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-[#b04623] transition-colors flex items-center gap-2 w-fit">
             Choose a plan <ArrowRight size={14} />
           </Link>
         </div>
       )}
 
       {hasPlan && (
-        <div className="bg-[#c8522a]/5 border border-[#c8522a]/20 rounded-2xl p-4 mb-6 flex items-center gap-3">
-          <CheckCircle size={16} className="text-[#c8522a]" />
+        <div className="bg-[#c8522a]/5 border border-[#c8522a]/20 rounded-2xl p-4 mb-6 flex items-start sm:items-center gap-3">
+          <CheckCircle size={16} className="text-[#c8522a] flex-shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-sm text-gray-700">
             You&apos;re on the <span className="font-semibold text-[#c8522a]">{PLAN_LABELS[profile.plan] ?? profile.plan}</span> plan. Your team has been notified and will be in touch shortly.
           </p>
@@ -71,13 +71,13 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Hours reclaimed', value: '—', sub: 'This month', icon: Clock, color: 'text-[#c8522a]', bg: 'bg-[#c8522a]/8' },
           { label: 'Content produced', value: '—', sub: 'Total pieces', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
           { label: 'Active services', value: '—', sub: 'Running now', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50' },
         ].map((card) => (
-          <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center mb-4`}>
               <card.icon size={15} className={card.color} />
             </div>
@@ -88,13 +88,13 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { href: '/dashboard/services', icon: ShoppingBag, label: 'Services', desc: 'Request and track your marketing services', cta: 'View services' },
           { href: '/dashboard/ai-toolkit', icon: Zap, label: 'AI Toolkit', desc: 'Generate content, captions, emails, and more', cta: 'Open toolkit' },
           { href: '/dashboard/analytics', icon: BarChart2, label: 'Analytics', desc: 'Connect your accounts and track performance', cta: 'View analytics' },
         ].map((card) => (
-          <Link key={card.href} href={card.href} className="bg-white rounded-2xl border border-gray-100 p-6 hover:border-gray-200 hover:shadow-sm transition-all group">
+          <Link key={card.href} href={card.href} className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
             <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center mb-4 group-hover:bg-[#c8522a]/8 transition-colors">
               <card.icon size={16} className="text-gray-400 group-hover:text-[#c8522a] transition-colors" />
             </div>

@@ -46,3 +46,4 @@ next-env.d.ts
 # agent skills (local tooling, not part of the app)
 /.agents/
 /skills-lock.json
+.env*.local

@@ -253,21 +253,21 @@ export default function AIToolkitClient({
   const totalHours = Math.round(totalTimeSaved / 60 * 10) / 10
 
   return (
-    <div className="px-8 py-8 max-w-5xl">
+    <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-5xl">
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div>
           <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">AI Toolkit</p>
           <h1 className="text-2xl font-bold text-gray-900">Your AI tools</h1>
           <p className="text-gray-500 text-sm mt-1">Generate content, copy, and strategy in seconds.</p>
         </div>
-        <div className="flex gap-3">
-          <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3 text-center">
+        <div className="flex gap-3 sm:flex-shrink-0">
+          <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 text-center flex-1 sm:flex-initial sm:px-5">
             <p className="text-xl font-bold text-[#c8522a]">{totalOutputs}</p>
-            <p className="text-xs text-gray-400">Outputs generated</p>
+            <p className="text-xs text-gray-400">Outputs</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3 text-center">
+          <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 text-center flex-1 sm:flex-initial sm:px-5">
             <p className="text-xl font-bold text-green-500">{totalHours}h</p>
             <p className="text-xs text-gray-400">Time saved</p>
           </div>
@@ -292,8 +292,8 @@ export default function AIToolkitClient({
       {activeTab === 'library' && (
         <>
           {/* Search + category filter */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="relative flex-1 max-w-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+            <div className="relative w-full sm:flex-1 sm:max-w-xs">
               <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300" />
               <input
                 type="text"
@@ -325,7 +325,7 @@ export default function AIToolkitClient({
           </div>
 
           {/* Prompt cards */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filtered.map(prompt => (
               <button
                 key={prompt.id}

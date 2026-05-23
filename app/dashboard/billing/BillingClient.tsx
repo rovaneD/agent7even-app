@@ -268,7 +268,7 @@ export default function BillingClient({
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Upgrade your plan</p>
           <p className="text-sm text-gray-500 mb-6">Get more done with a higher tier.</p>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {UPGRADE_PLANS.filter(p => p.id !== plan).map(upgradePlan => {
               const Icon = upgradePlan.icon
               return (
