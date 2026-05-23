@@ -45,9 +45,21 @@ export async function GET() {
   const data = await res.json()
 
   if (data.error) {
-    console.error('GA Admin API error:', data.error)
-    return NextResponse.json({ error: data.error.message, properties: [] }, { status: 400 })
+    console.error('GA Admin API error:', JSON.stringify(data.error))
+    return NextResponse.json({
+      error: data.error.message,
+      errorCode: data.error.code,
+      errorStatus: data.error.status,
+      properties: [],
+    }, { status: 400 })
   }
+
+  // Log raw response shape for debugging
+  console.log('accountSummaries raw:', JSON.stringify({
+    accountCount: (data.accountSummaries ?? []).length,
+    nextPageToken: data.nextPageToken,
+    keys: Object.keys(data),
+  }))
 
   const properties: { id: string; name: string; account: string }[] = []
   for (const account of data.accountSummaries ?? []) {
@@ -60,5 +72,5 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ properties })
+  return NextResponse.json({ properties, debug: { accountCount: (data.accountSummaries ?? []).length } })
 }

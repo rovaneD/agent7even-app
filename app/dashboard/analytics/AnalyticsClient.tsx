@@ -290,8 +290,12 @@ function PropertySelectorModal({
     fetch('/api/analytics/ga-properties')
       .then(r => r.json())
       .then(d => {
-        setProperties(d.properties ?? [])
-        if (d.properties?.length === 1) setSelected(d.properties[0].id)
+        if (d.error) {
+          setError(`API error (${d.errorCode ?? '?'}): ${d.error}`)
+        } else {
+          setProperties(d.properties ?? [])
+          if (d.properties?.length === 1) setSelected(d.properties[0].id)
+        }
       })
       .catch(() => setError('Could not load properties. Try refreshing.'))
       .finally(() => setLoading(false))
