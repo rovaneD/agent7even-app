@@ -53,7 +53,7 @@ export default function DashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="h-screen bg-gray-50 flex overflow-hidden">
+    <div className="min-h-screen bg-gray-50 flex">
 
       {/* Sidebar */}
       <aside
@@ -117,6 +117,13 @@ export default function DashboardLayout({
           <UserButton />
           <span className="text-xs text-gray-400 truncate">My account</span>
         </div>
+
+        {/* Legal links */}
+        <div className="px-5 pb-4 flex items-center gap-3">
+          <a href="/privacy" target="_blank" className="text-[10px] text-gray-300 hover:text-gray-500 transition-colors">Privacy</a>
+          <span className="text-gray-200 text-[10px]">·</span>
+          <a href="/terms" target="_blank" className="text-[10px] text-gray-300 hover:text-gray-500 transition-colors">Terms</a>
+        </div>
       </aside>
 
       {/* Mobile overlay */}
@@ -145,15 +152,6 @@ export default function DashboardLayout({
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
-
-        {/* Footer */}
-        <footer className="border-t border-gray-50 px-6 py-4 flex items-center justify-between text-xs text-gray-300">
-          <span>© {new Date().getFullYear()} Agent7even</span>
-          <div className="flex items-center gap-4">
-            <a href="/privacy" target="_blank" className="hover:text-gray-500 transition-colors">Privacy</a>
-            <a href="/terms" target="_blank" className="hover:text-gray-500 transition-colors">Terms</a>
-          </div>
-        </footer>
 
       </div>
     </div>
