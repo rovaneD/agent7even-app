@@ -1,11 +1,40 @@
-import { verifyWebhook } from '@clerk/nextjs/webhooks'
-import { NextRequest } from 'next/server'
+import { Webhook } from 'svix'
+import { headers } from 'next/headers'
+import { WebhookEvent } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { Resend } from 'resend'
+import { welcomeEmailHtml, welcomeEmailText } from '@/emails/welcome'
 
-export async function POST(req: NextRequest) {
-  let evt
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+export async function POST(req: Request) {
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SIGNING_SECRET
+
+  if (!WEBHOOK_SECRET) {
+    throw new Error('Missing CLERK_WEBHOOK_SIGNING_SECRET')
+  }
+
+  const headerPayload = await headers()
+  const svix_id = headerPayload.get('svix-id')
+  const svix_timestamp = headerPayload.get('svix-timestamp')
+  const svix_signature = headerPayload.get('svix-signature')
+
+  if (!svix_id || !svix_timestamp || !svix_signature) {
+    return new Response('Missing svix headers', { status: 400 })
+  }
+
+  const payload = await req.json()
+  const body = JSON.stringify(payload)
+
+  const wh = new Webhook(WEBHOOK_SECRET)
+  let evt: WebhookEvent
+
   try {
-    evt = await verifyWebhook(req)
+    evt = wh.verify(body, {
+      'svix-id': svix_id,
+      'svix-timestamp': svix_timestamp,
+      'svix-signature': svix_signature,
+    }) as WebhookEvent
   } catch (err) {
     console.error('Webhook verification failed:', err)
     return new Response('Verification failed', { status: 400 })
@@ -15,58 +44,72 @@ export async function POST(req: NextRequest) {
 
   if (evt.type === 'user.created') {
     const { id, email_addresses, first_name, last_name, image_url } = evt.data
-    const email = email_addresses[0]?.email_address ?? ''
-    const full_name = `${first_name ?? ''} ${last_name ?? ''}`.trim()
 
-    const { error } = await supabase.from('profiles').upsert(
-      {
-        clerk_user_id: id,
-        email,
-        full_name: full_name || null,
-        avatar_url: image_url ?? null,
-      },
-      { onConflict: 'clerk_user_id' },
-    )
+    const email = email_addresses?.[0]?.email_address ?? ''
+    const fullName = [first_name, last_name].filter(Boolean).join(' ')
+
+    const { error } = await supabase.from('profiles').upsert({
+      clerk_user_id: id,
+      email,
+      full_name: fullName,
+      avatar_url: image_url ?? '',
+      role: 'client',
+      status: 'onboarding',
+      onboarding_complete: false,
+    }, { onConflict: 'clerk_user_id' })
 
     if (error) {
-      console.error('profiles upsert error (user.created):', error)
-      return new Response('DB error', { status: 500 })
+      console.error('Supabase upsert error (user.created):', error)
+    }
+
+    // Send welcome email
+    if (email) {
+      try {
+        await resend.emails.send({
+          from: 'Agent7even <hello@agent7even.com>',
+          to: email,
+          subject: 'Welcome to Agent7even — your portal is ready',
+          html: welcomeEmailHtml(first_name ?? ''),
+          text: welcomeEmailText(first_name ?? ''),
+        })
+      } catch (emailError) {
+        // Log but don't fail the webhook — user is still created
+        console.error('Welcome email failed:', emailError)
+      }
     }
   }
 
   if (evt.type === 'user.updated') {
     const { id, email_addresses, first_name, last_name, image_url } = evt.data
-    const email = email_addresses[0]?.email_address ?? ''
-    const full_name = `${first_name ?? ''} ${last_name ?? ''}`.trim()
+
+    const email = email_addresses?.[0]?.email_address ?? ''
+    const fullName = [first_name, last_name].filter(Boolean).join(' ')
 
     const { error } = await supabase
       .from('profiles')
       .update({
         email,
-        full_name: full_name || null,
-        avatar_url: image_url ?? null,
+        full_name: fullName,
+        avatar_url: image_url ?? '',
         updated_at: new Date().toISOString(),
       })
       .eq('clerk_user_id', id)
 
     if (error) {
-      console.error('profiles update error (user.updated):', error)
-      return new Response('DB error', { status: 500 })
+      console.error('Supabase update error (user.updated):', error)
     }
   }
 
   if (evt.type === 'user.deleted') {
     const { id } = evt.data
-    if (id) {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('clerk_user_id', id)
 
-      if (error) {
-        console.error('profiles delete error (user.deleted):', error)
-        return new Response('DB error', { status: 500 })
-      }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: 'churned', updated_at: new Date().toISOString() })
+      .eq('clerk_user_id', id)
+
+    if (error) {
+      console.error('Supabase update error (user.deleted):', error)
     }
   }
 
