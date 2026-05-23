@@ -37,17 +37,28 @@ export async function GET() {
     return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
   }
 
-  // List all GA4 properties accessible to this user
+  // accountSummaries returns all accounts + their GA4 properties in one call
   const res = await fetch(
-    'https://analyticsadmin.googleapis.com/v1beta/properties?filter=parent:accounts/-&pageSize=50',
+    'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200',
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json()
 
-  const properties = (data.properties ?? []).map((p: {name: string; displayName: string}) => ({
-    id: p.name.replace('properties/', ''),
-    name: p.displayName,
-  }))
+  if (data.error) {
+    console.error('GA Admin API error:', data.error)
+    return NextResponse.json({ error: data.error.message, properties: [] }, { status: 400 })
+  }
+
+  const properties: { id: string; name: string; account: string }[] = []
+  for (const account of data.accountSummaries ?? []) {
+    for (const prop of account.propertySummaries ?? []) {
+      properties.push({
+        id: (prop.property as string).replace('properties/', ''),
+        name: prop.displayName as string,
+        account: account.displayName as string,
+      })
+    }
+  }
 
   return NextResponse.json({ properties })
 }
