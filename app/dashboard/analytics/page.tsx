@@ -10,7 +10,7 @@ export default async function AnalyticsPage() {
   const supabase = createServiceClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, company_name, plan')
+    .select('id, company_name, plan, ga_measurement_id, instagram_handle, meta_ad_account_id')
     .eq('clerk_user_id', userId)
     .single()
 
@@ -18,6 +18,9 @@ export default async function AnalyticsPage() {
     <AnalyticsClient
       companyName={profile?.company_name ?? ''}
       plan={profile?.plan ?? ''}
+      gaMeasurementId={profile?.ga_measurement_id ?? null}
+      instagramHandle={profile?.instagram_handle ?? null}
+      metaAdAccountId={profile?.meta_ad_account_id ?? null}
     />
   )
 }

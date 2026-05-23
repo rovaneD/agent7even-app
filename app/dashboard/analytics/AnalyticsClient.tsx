@@ -6,17 +6,23 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts'
 import {
-  Globe, Hash, TrendingUp, Info, Users, Eye, MousePointerClick,
-  Lock, ExternalLink, Calendar, ArrowUpRight, ArrowDownRight
+  Globe, Hash, Info, Eye, MousePointerClick,
+  Lock, Calendar, ArrowUpRight, ArrowDownRight,
+  X, CheckCircle, Clock,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Range = '7d' | '30d' | '90d'
 
+type Platform = 'google_analytics' | 'instagram' | 'meta'
+
 interface Props {
   companyName: string
   plan: string
+  gaMeasurementId: string | null
+  instagramHandle: string | null
+  metaAdAccountId: string | null
 }
 
 // ── Dummy data ────────────────────────────────────────────────────────────────
@@ -167,6 +173,115 @@ function InfoTooltip({ text }: { text: string }) {
   )
 }
 
+const PLATFORM_CONFIG: Record<Platform, {
+  label: string
+  fieldLabel: string
+  placeholder: string
+  hint: string
+}> = {
+  google_analytics: {
+    label: 'Google Analytics',
+    fieldLabel: 'Measurement ID',
+    placeholder: 'G-XXXXXXXXXX',
+    hint: 'Find this in Google Analytics → Admin → Data Streams → your stream → Measurement ID.',
+  },
+  instagram: {
+    label: 'Instagram',
+    fieldLabel: 'Instagram handle',
+    placeholder: '@yourbrand',
+    hint: 'Your Instagram username (with or without @). Must be a Business or Creator account.',
+  },
+  meta: {
+    label: 'Meta Ads',
+    fieldLabel: 'Ad Account ID',
+    placeholder: 'act_XXXXXXXXXX',
+    hint: 'Find this in Meta Business Suite → Ad Accounts. Format is usually act_ followed by digits.',
+  },
+}
+
+function ConnectModal({
+  platform,
+  initialValue,
+  onClose,
+  onSuccess,
+}: {
+  platform: Platform
+  initialValue: string
+  onClose: () => void
+  onSuccess: (value: string) => void
+}) {
+  const cfg = PLATFORM_CONFIG[platform]
+  const [value, setValue] = useState(initialValue)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    if (!value.trim()) { setError('Please enter a value.'); return }
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/analytics/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, value: value.trim() }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      onSuccess(value.trim())
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+        >
+          <X size={14} className="text-gray-500" />
+        </button>
+
+        <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-1">Connect</p>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">{cfg.label}</h2>
+        <p className="text-sm text-gray-400 mb-5">
+          Enter your {cfg.fieldLabel.toLowerCase()} and we'll set up the connection for you.
+        </p>
+
+        <label className="block text-xs font-semibold text-gray-700 mb-1.5">{cfg.fieldLabel}</label>
+        <input
+          type="text"
+          value={value}
+          onChange={e => { setValue(e.target.value); setError('') }}
+          placeholder={cfg.placeholder}
+          className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:border-[#c8522a] focus:ring-1 focus:ring-[#c8522a] transition-colors"
+        />
+        <p className="text-xs text-gray-400 mt-2 leading-relaxed">{cfg.hint}</p>
+
+        {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={loading}
+            className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#c8522a] rounded-xl hover:bg-[#b8471f] disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Saving…' : 'Request connection'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LockedSection({
   title,
   description,
@@ -175,7 +290,9 @@ function LockedSection({
   logoSrc,
   logoDark,
   connectLabel,
-  connectHref,
+  platform,
+  pendingValue,
+  onConnect,
 }: {
   title: string
   description: string
@@ -184,8 +301,12 @@ function LockedSection({
   logoSrc?: string
   logoDark?: boolean
   connectLabel: string
-  connectHref: string
+  platform: Platform
+  pendingValue: string | null
+  onConnect: (platform: Platform) => void
 }) {
+  const isPending = Boolean(pendingValue)
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100">
       <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
@@ -200,10 +321,17 @@ function LockedSection({
           <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
           <InfoTooltip text={tooltip} />
         </div>
-        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
-          <Lock size={11} />
-          Not connected
-        </span>
+        {isPending ? (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">
+            <Clock size={11} />
+            Pending
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
+            <Lock size={11} />
+            Not connected
+          </span>
+        )}
       </div>
 
       {/* Blurred dummy chart */}
@@ -217,19 +345,29 @@ function LockedSection({
         </div>
         {/* Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/60">
-          <div className="text-center">
-            <p className="text-sm font-semibold text-gray-800 mb-1">{description}</p>
-            <p className="text-xs text-gray-400">Connect your account to see live data here.</p>
-          </div>
-          <a
-            href={connectHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-[#b8471f] transition-colors pointer-events-auto"
-          >
-            {connectLabel}
-            <ExternalLink size={12} />
-          </a>
+          {isPending ? (
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <CheckCircle size={18} className="text-amber-500" />
+                <p className="text-sm font-semibold text-gray-800">Connection requested</p>
+              </div>
+              <p className="text-xs text-gray-400 mb-1">Your Agent7even team will confirm this shortly.</p>
+              <p className="text-xs text-gray-300">{pendingValue}</p>
+            </div>
+          ) : (
+            <>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-800 mb-1">{description}</p>
+                <p className="text-xs text-gray-400">Connect your account to see live data here.</p>
+              </div>
+              <button
+                onClick={() => onConnect(platform)}
+                className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-[#b8471f] transition-colors pointer-events-auto"
+              >
+                {connectLabel}
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="h-16 rounded-b-2xl overflow-hidden" />
@@ -239,8 +377,19 @@ function LockedSection({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AnalyticsClient({ companyName }: Props) {
+export default function AnalyticsClient({
+  companyName,
+  gaMeasurementId,
+  instagramHandle,
+  metaAdAccountId,
+}: Props) {
   const [range, setRange] = useState<Range>('7d')
+  const [activePlatform, setActivePlatform] = useState<Platform | null>(null)
+
+  // Local optimistic state so UI updates immediately after modal submit
+  const [gaId, setGaId] = useState(gaMeasurementId)
+  const [igHandle, setIgHandle] = useState(instagramHandle)
+  const [metaId, setMetaId] = useState(metaAdAccountId)
 
   const websiteData =
     range === '7d' ? websiteData7d : range === '30d' ? websiteData30d : websiteData90d
@@ -251,8 +400,28 @@ export default function AnalyticsClient({ companyName }: Props) {
     '90d': 'Last 90 days',
   }
 
+  const handleSuccess = (platform: Platform, value: string) => {
+    if (platform === 'google_analytics') setGaId(value)
+    if (platform === 'instagram') setIgHandle(value)
+    if (platform === 'meta') setMetaId(value)
+    setActivePlatform(null)
+  }
+
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
+
+      {activePlatform && (
+        <ConnectModal
+          platform={activePlatform}
+          initialValue={
+            activePlatform === 'google_analytics' ? (gaId ?? '') :
+            activePlatform === 'instagram' ? (igHandle ?? '') :
+            (metaId ?? '')
+          }
+          onClose={() => setActivePlatform(null)}
+          onSuccess={(value) => handleSuccess(activePlatform, value)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -308,7 +477,9 @@ export default function AnalyticsClient({ companyName }: Props) {
         icon={Globe}
         logoSrc="/_google_analytics_icon.png"
         connectLabel="Connect Google Analytics"
-        connectHref="https://analytics.google.com"
+        platform="google_analytics"
+        pendingValue={gaId}
+        onConnect={setActivePlatform}
       />
 
       {/* Social Media */}
@@ -319,7 +490,9 @@ export default function AnalyticsClient({ companyName }: Props) {
         icon={Hash}
         logoSrc="/instagram-logo.png"
         connectLabel="Connect Instagram"
-        connectHref="https://www.instagram.com/accounts/convert_to_business/"
+        platform="instagram"
+        pendingValue={igHandle}
+        onConnect={setActivePlatform}
       />
 
       {/* Paid Ads */}
@@ -331,7 +504,9 @@ export default function AnalyticsClient({ companyName }: Props) {
         logoSrc="/MetaLogo.png"
         logoDark
         connectLabel="Connect Meta Ads"
-        connectHref="https://business.facebook.com/settings"
+        platform="meta"
+        pendingValue={metaId}
+        onConnect={setActivePlatform}
       />
 
     </div>
