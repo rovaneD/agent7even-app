@@ -146,6 +146,15 @@ export default function DashboardLayout({
           {children}
         </main>
 
+        {/* Footer */}
+        <footer className="border-t border-gray-50 px-6 py-4 flex items-center justify-between text-xs text-gray-300">
+          <span>© {new Date().getFullYear()} Agent7even</span>
+          <div className="flex items-center gap-4">
+            <a href="/privacy" target="_blank" className="hover:text-gray-500 transition-colors">Privacy</a>
+            <a href="/terms" target="_blank" className="hover:text-gray-500 transition-colors">Terms</a>
+          </div>
+        </footer>
+
       </div>
     </div>
   )
