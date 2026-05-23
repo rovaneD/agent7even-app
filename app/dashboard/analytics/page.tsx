@@ -1,9 +1,23 @@
-export default function AnalyticsPage() {
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+import { createServiceClient } from '@/lib/supabase/server'
+import AnalyticsClient from './AnalyticsClient'
+
+export default async function AnalyticsPage() {
+  const { userId } = await auth()
+  if (!userId) redirect('/sign-in')
+
+  const supabase = createServiceClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, company_name, plan')
+    .eq('clerk_user_id', userId)
+    .single()
+
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8">
-      <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">Analytics</p>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Analytics</h1>
-      <p className="text-gray-400 text-sm">This section is coming soon.</p>
-    </div>
+    <AnalyticsClient
+      companyName={profile?.company_name ?? ''}
+      plan={profile?.plan ?? ''}
+    />
   )
 }
