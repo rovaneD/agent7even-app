@@ -52,6 +52,14 @@ The marketing/landing site (`agent7even.com` / `www.agent7even.com`) is a **sepa
 - Events subscribed: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 - One-time checkouts have `invoice_creation: { enabled: true }` so invoices appear in billing history
 
+### Cross-Site Links
+The marketing site (`agent7even.com`) links directly to the app for auth actions:
+
+- **Sign up CTA** → `https://app.agent7even.com/sign-up`
+- **Log in / Sign in CTA** → `https://app.agent7even.com/sign-in`
+
+No changes are needed on the app side. These are simple `href` updates on the marketing site (`~/agent7even`) only.
+
 ### Vercel Environment Variables (all set in production)
 ```
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY    pk_live_...
@@ -311,7 +319,11 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 - Client can update `company_name`, `website_url`, `instagram_handle`
 - At `/dashboard/settings`
 
-### 7. Go live on Stripe — WHEN READY
+### 7. Marketing site auth links — WHEN READY
+- Update sign up and log in CTAs on `agent7even.com` to point to `app.agent7even.com/sign-up` and `app.agent7even.com/sign-in`
+- Changes are in `~/agent7even/src/components/` (Nav.tsx, Hero.tsx, CTA.tsx) — simple `href` swaps only
+
+### 8. Go live on Stripe — WHEN READY
 - Switch from test keys (`sk_test_`, `pk_test_`) to live keys (`sk_live_`, `pk_live_`)
 - Recreate the 3 products/prices in Stripe live mode → get new `price_` IDs
 - Update all 6 Stripe env vars in Vercel
