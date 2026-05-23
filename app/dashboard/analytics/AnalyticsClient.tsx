@@ -130,9 +130,9 @@ function InfoTooltip({ text }: { text: string }) {
         <Info size={11} />
       </button>
       {show && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-64 bg-gray-900 text-white text-xs leading-relaxed rounded-xl px-3 py-2.5 shadow-lg pointer-events-none">
+        <div className="absolute left-0 top-full mt-2 z-50 w-72 bg-gray-900 text-white text-xs leading-relaxed rounded-xl px-3 py-2.5 shadow-xl pointer-events-none">
+          <div className="absolute left-2 bottom-full w-2 h-2 bg-gray-900 rotate-45 mb-[-4px]" />
           {text}
-          <div className="absolute left-1/2 -translate-x-1/2 top-full w-2 h-2 bg-gray-900 rotate-45 -mt-1" />
         </div>
       )}
     </div>
@@ -155,8 +155,8 @@ function LockedSection({
   connectHref: string
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+    <div className="bg-white rounded-2xl border border-gray-100">
+      <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center">
             <Icon size={16} className="text-gray-400" />
@@ -196,7 +196,7 @@ function LockedSection({
           </a>
         </div>
       </div>
-      <div className="h-16" />
+      <div className="h-16 rounded-b-2xl overflow-hidden" />
     </div>
   )
 }
