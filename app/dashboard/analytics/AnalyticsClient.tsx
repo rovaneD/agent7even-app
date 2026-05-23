@@ -6,7 +6,7 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts'
 import {
-  Globe, Hash, TrendingUp, Users, Eye, MousePointerClick,
+  Globe, Hash, TrendingUp, Info, Users, Eye, MousePointerClick,
   Lock, ExternalLink, Calendar, ArrowUpRight, ArrowDownRight
 } from 'lucide-react'
 
@@ -115,15 +115,41 @@ function StatCard({
   )
 }
 
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onFocus={() => setShow(true)}
+        onBlur={() => setShow(false)}
+        className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors flex-shrink-0"
+        aria-label="More info"
+      >
+        <Info size={11} />
+      </button>
+      {show && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-64 bg-gray-900 text-white text-xs leading-relaxed rounded-xl px-3 py-2.5 shadow-lg pointer-events-none">
+          {text}
+          <div className="absolute left-1/2 -translate-x-1/2 top-full w-2 h-2 bg-gray-900 rotate-45 -mt-1" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function LockedSection({
   title,
   description,
+  tooltip,
   icon: Icon,
   connectLabel,
   connectHref,
 }: {
   title: string
   description: string
+  tooltip: string
   icon: React.ElementType
   connectLabel: string
   connectHref: string
@@ -136,6 +162,7 @@ function LockedSection({
             <Icon size={16} className="text-gray-400" />
           </div>
           <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+          <InfoTooltip text={tooltip} />
         </div>
         <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
           <Lock size={11} />
@@ -230,9 +257,10 @@ export default function AnalyticsClient({ companyName }: Props) {
       <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
         <Calendar size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-amber-700 leading-relaxed">
-          <span className="font-semibold">Live analytics are coming.</span>{' '}
+          <span className="font-semibold">          Live analytics are coming.</span>{' '}
           Connect your Google Analytics, Instagram, and Meta Ads accounts below to start seeing real data.
-          Your Agent7even team can also help with setup — just reach out via Support.
+          Your Agent7even team can also help with setup —{' '}
+          <a href="/dashboard/support" className="font-semibold underline underline-offset-2 hover:text-amber-900 transition-colors">reach out via Support</a>.
         </p>
       </div>
 
@@ -240,6 +268,7 @@ export default function AnalyticsClient({ companyName }: Props) {
       <LockedSection
         title="Website Analytics"
         description="Connect Google Analytics to track sessions, users, and pageviews."
+        tooltip="To connect, go to analytics.google.com, create a property for your website, then share View access with your Agent7even team or paste your Measurement ID into your site settings. We'll wire it up for you."
         icon={Globe}
         connectLabel="Connect Google Analytics"
         connectHref="https://analytics.google.com"
@@ -249,18 +278,20 @@ export default function AnalyticsClient({ companyName }: Props) {
       <LockedSection
         title="Social Media"
         description="Connect Instagram to track followers, reach, and impressions."
+        tooltip="To connect, your Instagram must be a Business or Creator account linked to a Facebook Page. Go to instagram.com → Settings → Account → Switch to Professional Account. Then share access with your Agent7even team via Meta Business Suite."
         icon={Hash}
         connectLabel="Connect Instagram"
-        connectHref="https://www.instagram.com"
+        connectHref="https://www.instagram.com/accounts/convert_to_business/"
       />
 
       {/* Paid Ads */}
       <LockedSection
         title="Paid Ads"
         description="Connect Meta Ads to track spend, clicks, and conversions."
+        tooltip="To connect, go to Meta Business Suite → Settings → People, and add your Agent7even team as a Partner with Advertiser access to your Ad Account. This lets us pull spend, clicks, and conversion data into your dashboard."
         icon={MousePointerClick}
         connectLabel="Connect Meta Ads"
-        connectHref="https://www.facebook.com/adsmanager"
+        connectHref="https://business.facebook.com/settings"
       />
 
     </div>
