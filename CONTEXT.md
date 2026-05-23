@@ -67,7 +67,9 @@ No changes are needed on the app side. These are simple `href` updates on the ma
 - Scope requested: `https://www.googleapis.com/auth/analytics.readonly`
 - APIs enabled in GCP: **Google Analytics Data API** + **Google Analytics Admin API**
 - Service account: `agent7even-analytics@agent7even-analytics.iam.gserviceaccount.com`
-- OAuth consent screen: External, published (in review for Google verification)
+- OAuth consent screen: **External, branding verified and published** ✅ — no "unverified app" warning shown to users
+- Consent screen branding: App name "Agent7even", homepage `https://app.agent7even.com`, privacy `https://app.agent7even.com/privacy`, terms `https://app.agent7even.com/terms`
+- Authorized domain: `agent7even.com` (verified via Google Search Console)
 
 ### Vercel Environment Variables (all set in production)
 ```
@@ -324,6 +326,9 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 - [x] **Analytics tab** — Google Analytics OAuth self-serve flow (connect, property selector, live chart), Instagram + Meta pending placeholders, disconnect/reset
 - [x] **Privacy Policy** (`/privacy`) and **Terms of Service** (`/terms`) — public pages, no auth required
 - [x] Legal links on sign-in, sign-up, homepage, dashboard sidebar, and marketing site footer
+- [x] **Google OAuth verified and published** — branding verified, clean consent screen, no unverified warning
+- [x] GA tag moved to `<head>` on marketing site for proper Search Console detection
+- [x] `agent7even.com` verified in Google Search Console
 
 ---
 
@@ -356,10 +361,10 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Same Clerk `clerkMiddleware` 
 - Client can update `company_name`, `website_url`, `instagram_handle`
 - At `/dashboard/settings`
 
-### 7. Google OAuth verification — PENDING
-- App submitted for verification with Google (analytics.readonly scope)
-- Until verified, users see "unverified app" warning but can still proceed
-- Privacy Policy URL: `https://app.agent7even.com/privacy`
+### 7. Google OAuth verification — COMPLETE ✅
+- Branding verified and published — no warning screen for users
+- Privacy Policy: `https://app.agent7even.com/privacy`
+- Terms: `https://app.agent7even.com/terms`
 
 ### 8. Marketing site auth links — WHEN READY
 - Update sign up and log in CTAs on `agent7even.com` to point to `app.agent7even.com/sign-up` and `app.agent7even.com/sign-in`
