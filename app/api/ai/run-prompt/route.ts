@@ -20,11 +20,38 @@ export async function POST(req: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, plan')
     .eq('clerk_user_id', userId)
     .single()
 
   if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
+  // Enforce Starter plan run limit (dynamic from platform_settings)
+  if (!profile.plan || profile.plan === 'starter') {
+    const { data: limitSetting } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'starter_ai_limit')
+      .single()
+    const STARTER_LIMIT = (limitSetting?.value as number) ?? 15
+
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+
+    const { count } = await supabase
+      .from('ai_tool_usage')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.id)
+      .gte('created_at', startOfMonth.toISOString())
+
+    if ((count ?? 0) >= STARTER_LIMIT) {
+      return NextResponse.json(
+        { error: 'Monthly limit reached. Upgrade to Growth for unlimited runs.' },
+        { status: 429 }
+      )
+    }
+  }
 
   // Build system prompt
   let systemPrompt = `You are an expert marketing copywriter. Write compelling, professional marketing content based on the user's request. Be specific, actionable, and ready to use.`
