@@ -13,6 +13,11 @@ const plans = [
     annualPrice: 490,
     description: 'Everything you need to get started with smart marketing automation.',
     color: 'gray',
+    trial: true,
+    trialDays: 3,
+    billingNote: '3 days free — cancel anytime before being charged',
+    cta: 'Start free trial',
+    popular: false,
     features: [
       'Full client dashboard & portal',
       'AI Toolkit — 15 runs/month',
@@ -22,8 +27,6 @@ const plans = [
       'Email support',
       'Add-on services available',
     ],
-    cta: 'Get started',
-    popular: false,
   },
   {
     key: 'growth',
@@ -33,17 +36,21 @@ const plans = [
     annualPrice: 890,
     description: 'Unlimited AI, more active projects, and priority support for growing businesses.',
     color: 'orange',
+    trial: false,
+    trialDays: 0,
+    billingNote: 'Billed immediately — cancel anytime',
+    cta: 'Get started',
+    popular: true,
     features: [
       'Everything in Starter',
       'AI Toolkit — unlimited runs',
+      'Brand Kit — full access',
       '3 active service requests',
       'Priority email support',
       '10% discount on add-on services',
       'Advanced analytics',
       'Early access to new features',
     ],
-    cta: 'Get started',
-    popular: true,
   },
   {
     key: 'proagent',
@@ -53,6 +60,11 @@ const plans = [
     annualPrice: 1490,
     description: 'Unlimited everything, dedicated support, and maximum add-on savings.',
     color: 'dark',
+    trial: false,
+    trialDays: 0,
+    billingNote: 'Billed immediately — cancel anytime',
+    cta: 'Get started',
+    popular: false,
     features: [
       'Everything in Growth',
       'Unlimited active service requests',
@@ -62,8 +74,6 @@ const plans = [
       'White-glove onboarding',
       'First access to beta features',
     ],
-    cta: 'Get started',
-    popular: false,
   },
 ]
 
@@ -169,87 +179,107 @@ export default function PricingPage() {
       </div>
 
       {/* Plans */}
-      <div className="max-w-6xl mx-auto px-6 pb-24">
+      <div className="max-w-6xl mx-auto px-6 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((plan) => {
             const Icon = plan.icon
             const isLoading = loading === plan.key
 
             return (
-              <div
-                key={plan.key}
-                className={`relative rounded-2xl border flex flex-col ${
-                  plan.popular
-                    ? 'bg-[#c8522a] border-[#c8522a]'
-                    : 'bg-white/[0.03] border-white/10 hover:border-white/20'
-                } transition-all`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="bg-[#f5f4f0] text-[#0d0d0d] text-xs font-bold px-4 py-1.5 rounded-full tracking-wide uppercase">
-                      Most popular
+              <div key={plan.key} className="relative pt-3">
+                {/* Trial badge — sits above the card */}
+                {plan.trial && (
+                  <div className="absolute -top-0 left-1/2 -translate-x-1/2 z-10">
+                    <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block" />
+                      {plan.trialDays}-day free trial
                     </span>
                   </div>
                 )}
 
-                <div className="p-8 flex flex-col flex-1">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                      plan.popular ? 'bg-white/20' : 'bg-white/5'
-                    }`}>
-                      <Icon size={17} className={plan.popular ? 'text-white' : 'text-white/60'} />
-                    </div>
-                    <h3 className={`text-lg font-semibold ${plan.popular ? 'text-white' : 'text-[#f5f4f0]'}`}>
-                      {plan.name}
-                    </h3>
-                  </div>
-
-                  <div className="mb-2">
-                    <div className="flex items-end gap-1.5">
-                      <span className={`text-4xl font-semibold tracking-tight ${plan.popular ? 'text-white' : 'text-[#f5f4f0]'}`}>
-                        ${annual ? Math.round(plan.annualPrice / 12) : plan.monthlyPrice}
-                      </span>
-                      <span className={`text-sm mb-1.5 ${plan.popular ? 'text-white/60' : 'text-white/30'}`}>
-                        /mo
+                <div
+                  className={`relative rounded-2xl border flex flex-col h-full ${
+                    plan.popular
+                      ? 'bg-[#c8522a] border-[#c8522a]'
+                      : 'bg-white/[0.03] border-white/10 hover:border-white/20'
+                  } transition-all`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                      <span className="bg-[#f5f4f0] text-[#0d0d0d] text-xs font-bold px-4 py-1.5 rounded-full tracking-wide uppercase">
+                        Most popular
                       </span>
                     </div>
-                    {annual && (
-                      <p className={`text-xs mt-1 ${plan.popular ? 'text-white/70' : 'text-white/30'}`}>
-                        ${plan.annualPrice} billed annually
-                      </p>
-                    )}
-                  </div>
+                  )}
 
-                  <p className={`text-sm mb-8 leading-relaxed ${plan.popular ? 'text-white/70' : 'text-white/40'}`}>
-                    {plan.description}
-                  </p>
+                  <div className="p-8 flex flex-col flex-1">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                        plan.popular ? 'bg-white/20' : 'bg-white/5'
+                      }`}>
+                        <Icon size={17} className={plan.popular ? 'text-white' : 'text-white/60'} />
+                      </div>
+                      <h3 className={`text-lg font-semibold ${plan.popular ? 'text-white' : 'text-[#f5f4f0]'}`}>
+                        {plan.name}
+                      </h3>
+                    </div>
 
-                  <ul className="space-y-3 flex-1 mb-8">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3">
-                        <div className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center mt-0.5 ${
-                          plan.popular ? 'bg-white/20' : 'bg-white/10'
-                        }`}>
-                          <Check size={10} className={plan.popular ? 'text-white' : 'text-white/60'} />
-                        </div>
-                        <span className={`text-sm leading-snug ${plan.popular ? 'text-white/80' : 'text-white/50'}`}>
-                          {feature}
+                    <div className="mb-2">
+                      <div className="flex items-end gap-1.5">
+                        <span className={`text-4xl font-semibold tracking-tight ${plan.popular ? 'text-white' : 'text-[#f5f4f0]'}`}>
+                          ${annual ? Math.round(plan.annualPrice / 12) : plan.monthlyPrice}
                         </span>
-                      </li>
-                    ))}
-                  </ul>
+                        <span className={`text-sm mb-1.5 ${plan.popular ? 'text-white/60' : 'text-white/30'}`}>
+                          /mo
+                        </span>
+                      </div>
+                      {annual && (
+                        <p className={`text-xs mt-1 ${plan.popular ? 'text-white/70' : 'text-white/30'}`}>
+                          ${plan.annualPrice} billed annually
+                        </p>
+                      )}
+                      <p className={`text-xs mt-1.5 font-medium ${
+                        plan.trial
+                          ? 'text-emerald-400'
+                          : plan.popular ? 'text-white/60' : 'text-white/30'
+                      }`}>
+                        {plan.billingNote}
+                      </p>
+                    </div>
 
-                  <button
-                    onClick={() => handleCheckout(plan.key)}
-                    disabled={isLoading}
-                    className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                      plan.popular
-                        ? 'bg-white text-[#c8522a] hover:bg-[#f5f4f0]'
-                        : 'bg-white/10 text-[#f5f4f0] hover:bg-white/15 border border-white/10'
-                    }`}
-                  >
-                    {isLoading ? 'Redirecting...' : plan.cta}
-                  </button>
+                    <p className={`text-sm mt-4 mb-8 leading-relaxed ${plan.popular ? 'text-white/70' : 'text-white/40'}`}>
+                      {plan.description}
+                    </p>
+
+                    <ul className="space-y-3 flex-1 mb-8">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center mt-0.5 ${
+                            plan.popular ? 'bg-white/20' : 'bg-white/10'
+                          }`}>
+                            <Check size={10} className={plan.popular ? 'text-white' : 'text-white/60'} />
+                          </div>
+                          <span className={`text-sm leading-snug ${plan.popular ? 'text-white/80' : 'text-white/50'}`}>
+                            {feature}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      onClick={() => handleCheckout(plan.key)}
+                      disabled={isLoading}
+                      className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                        plan.trial
+                          ? 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                          : plan.popular
+                          ? 'bg-white text-[#c8522a] hover:bg-[#f5f4f0]'
+                          : 'bg-white/10 text-[#f5f4f0] hover:bg-white/15 border border-white/10'
+                      }`}
+                    >
+                      {isLoading ? 'Redirecting...' : plan.cta}
+                    </button>
+                  </div>
                 </div>
               </div>
             )
@@ -257,7 +287,8 @@ export default function PricingPage() {
         </div>
 
         <p className="text-center text-sm text-white/20 mt-10">
-          All plans include a 7-day free trial — cancel anytime before being charged.
+          Starter includes a 3-day free trial — card required, no charge until day 4.
+          Growth and ProAgent are charged immediately.{' '}
           Questions?{' '}
           <a href="mailto:hello@agent7even.com" className="text-white/40 hover:text-white/60 underline underline-offset-2">
             hello@agent7even.com
@@ -285,46 +316,18 @@ export default function PricingPage() {
               </thead>
               <tbody>
                 {[
-                  {
-                    feature: 'Dashboard & client portal',
-                    starter: true, growth: true, proagent: true,
-                  },
-                  {
-                    feature: 'AI Toolkit',
-                    starter: '15 runs/mo', growth: 'Unlimited', proagent: 'Unlimited',
-                  },
-                  {
-                    feature: 'Analytics',
-                    starter: 'Basic', growth: 'Full', proagent: 'Full',
-                  },
-                  {
-                    feature: 'Deliverables hub',
-                    starter: true, growth: true, proagent: true,
-                  },
-                  {
-                    feature: 'Active service requests',
-                    starter: '1', growth: '3', proagent: 'Unlimited',
-                  },
-                  {
-                    feature: 'Add-on discount',
-                    starter: '—', growth: '10% off', proagent: '15% off',
-                  },
-                  {
-                    feature: 'Support',
-                    starter: 'Email', growth: 'Priority email', proagent: 'Dedicated',
-                  },
-                  {
-                    feature: 'Quarterly strategy review',
-                    starter: false, growth: false, proagent: true,
-                  },
-                  {
-                    feature: 'White-glove onboarding',
-                    starter: false, growth: false, proagent: true,
-                  },
-                  {
-                    feature: 'Annual billing option',
-                    starter: true, growth: true, proagent: true,
-                  },
+                  { feature: 'Dashboard & client portal', starter: true, growth: true, proagent: true },
+                  { feature: 'AI Toolkit', starter: '15 runs/mo', growth: 'Unlimited', proagent: 'Unlimited' },
+                  { feature: 'Brand Kit', starter: false, growth: true, proagent: true },
+                  { feature: 'Analytics', starter: 'Basic', growth: 'Full', proagent: 'Full' },
+                  { feature: 'Deliverables hub', starter: true, growth: true, proagent: true },
+                  { feature: 'Active service requests', starter: '1', growth: '3', proagent: 'Unlimited' },
+                  { feature: 'Add-on discount', starter: '—', growth: '10% off', proagent: '15% off' },
+                  { feature: 'Support', starter: 'Email', growth: 'Priority email', proagent: 'Dedicated' },
+                  { feature: 'Quarterly strategy review', starter: false, growth: false, proagent: true },
+                  { feature: 'White-glove onboarding', starter: false, growth: false, proagent: true },
+                  { feature: '3-day free trial', starter: true, growth: false, proagent: false },
+                  { feature: 'Annual billing option', starter: true, growth: true, proagent: true },
                 ].map((row, i) => (
                   <tr
                     key={row.feature}
