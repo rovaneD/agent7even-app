@@ -1,8 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, Zap, TrendingUp, Star } from 'lucide-react'
 import { useUser } from '@clerk/nextjs'
+
+function trackEvent(action: string, params?: Record<string, string>) {
+  if (typeof window === 'undefined' || !window.gtag) return
+  window.gtag('event', action, params)
+}
 
 const plans = [
   {
@@ -82,7 +87,12 @@ export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null)
   const { isSignedIn } = useUser()
 
+  useEffect(() => {
+    trackEvent('pricing_view', { page: 'pricing' })
+  }, [])
+
   async function handleCheckout(planKey: string) {
+    trackEvent('plan_selected', { plan: planKey, billing: annual ? 'annual' : 'monthly' })
     setLoading(planKey)
     try {
       const res = await fetch('/api/stripe/checkout', {
