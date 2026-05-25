@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useClerk } from '@clerk/nextjs'
 import { Save, Loader2, CheckCircle, AlertCircle, User, Building, Globe, Hash } from 'lucide-react'
 
 interface Profile {
@@ -35,6 +36,7 @@ function planBadge(plan: string | null) {
 }
 
 export default function SettingsClient({ profile }: Props) {
+  const { openUserProfile } = useClerk()
   const [companyName, setCompanyName] = useState(profile.company_name ?? '')
   const [websiteUrl, setWebsiteUrl] = useState(profile.website_url ?? '')
   const [instagramHandle, setInstagramHandle] = useState(profile.instagram_handle ?? '')
@@ -112,9 +114,12 @@ export default function SettingsClient({ profile }: Props) {
         </div>
         <p className="text-xs text-gray-400 mt-4">
           To update your name or email, visit your{' '}
-          <a href="https://clerk.com" target="_blank" rel="noopener noreferrer" className="text-[#c8522a] underline underline-offset-2">
+          <button
+            onClick={() => openUserProfile()}
+            className="text-[#c8522a] underline underline-offset-2"
+          >
             account settings
-          </a>
+          </button>
           . To change your plan, go to{' '}
           <a href="/dashboard/billing" className="text-[#c8522a] underline underline-offset-2">Billing</a>.
         </p>
@@ -165,18 +170,21 @@ export default function SettingsClient({ profile }: Props) {
                 value={instagramHandle}
                 onChange={e => setInstagramHandle(e.target.value.replace('@', ''))}
                 placeholder="yourbusiness"
-                className="w-full text-sm border border-gray-200 rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:border-[#c8522a] focus:ring-1 focus:ring-[#c8522a]/20 placeholder:text-gray-300 transition-colors"
+                className={`w-full text-sm border rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:ring-1 placeholder:text-gray-300 transition-colors ${
+                  error
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                    : 'border-gray-200 focus:border-[#c8522a] focus:ring-[#c8522a]/20'
+                }`}
               />
             </div>
+            {error && (
+              <div className="flex items-center gap-2 mt-2">
+                <AlertCircle size={13} className="text-red-500 flex-shrink-0" />
+                <p className="text-xs text-red-600">{error}</p>
+              </div>
+            )}
           </div>
         </div>
-
-        {error && (
-          <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mt-5">
-            <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
 
         <div className="flex items-center justify-between mt-6 pt-5 border-t border-gray-50">
           <p className="text-xs text-gray-400">

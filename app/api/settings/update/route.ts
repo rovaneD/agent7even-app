@@ -7,6 +7,7 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { companyName, websiteUrl, instagramHandle } = await req.json()
+  console.log('Settings update called with:', { companyName, websiteUrl, instagramHandle })
 
   const supabase = createServiceClient()
 
