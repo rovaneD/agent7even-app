@@ -73,6 +73,10 @@ export default function PricingPage() {
   const { isSignedIn } = useUser()
 
   async function handleCheckout(planKey: string) {
+    if (!isSignedIn) {
+      window.location.href = `/sign-up?redirect_url=/pricing`
+      return
+    }
     setLoading(planKey)
     try {
       const res = await fetch('/api/stripe/checkout', {
@@ -84,9 +88,11 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
+        alert(data.error ?? 'Something went wrong. Please try again.')
         setLoading(null)
       }
     } catch {
+      alert('Something went wrong. Please try again.')
       setLoading(null)
     }
   }
@@ -242,7 +248,7 @@ export default function PricingPage() {
                         : 'bg-white/10 text-[#f5f4f0] hover:bg-white/15 border border-white/10'
                     }`}
                   >
-                    {isLoading ? 'Redirecting...' : plan.cta}
+                    {isLoading ? 'Redirecting...' : isSignedIn ? plan.cta : 'Get started →'}
                   </button>
                 </div>
               </div>

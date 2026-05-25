@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getNotifyEmail } from '@/lib/getNotifyEmail'
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Notify admin via email
-    const notifyEmail = process.env.NOTIFY_EMAIL
+    const notifyEmail = await getNotifyEmail()
     if (notifyEmail) {
       try {
         const { Resend } = await import('resend')

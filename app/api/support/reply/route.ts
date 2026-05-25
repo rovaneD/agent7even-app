@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
+import { getNotifyEmail } from '@/lib/getNotifyEmail'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -87,10 +88,11 @@ export async function POST(req: Request) {
       }
     }
   } else {
+    const notifyEmail = await getNotifyEmail()
     try {
       await resend.emails.send({
         from: 'Agent7even <hello@agent7even.com>',
-        to: 'admin@agent7even.com',
+        to: notifyEmail,
         subject: `Re: ${ticket.subject} — ${profile.company_name ?? profile.full_name}`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">

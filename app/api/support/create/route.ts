@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
+import { getNotifyEmail } from '@/lib/getNotifyEmail'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -53,10 +54,12 @@ export async function POST(req: Request) {
   const priorityLabel = priority === 'urgent' ? '🚨 URGENT' : priority === 'medium' ? '⚠️ Medium' : 'Low'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.agent7even.com'
 
+  const notifyEmail = await getNotifyEmail()
+
   try {
     await resend.emails.send({
       from: 'Agent7even <hello@agent7even.com>',
-      to: 'admin@agent7even.com',
+      to: notifyEmail,
       subject: `[${priorityLabel}] New support ticket — ${subject}`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
