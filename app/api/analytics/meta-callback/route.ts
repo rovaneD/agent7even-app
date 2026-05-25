@@ -92,7 +92,8 @@ export async function GET(req: Request) {
         meta_access_token: accessToken,
         meta_ad_account_id: adAccountId,
         meta_ig_account_id: igAccountId,
-        instagram_handle: igHandle,
+        // Only overwrite instagram_handle if Meta returned one — preserve manually-entered value otherwise
+        ...(igHandle ? { instagram_handle: igHandle } : {}),
         meta_connected: true,
         updated_at: new Date().toISOString(),
       })
