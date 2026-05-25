@@ -24,9 +24,7 @@ const PRICE_IDS: Record<string, { monthly: string; annual: string }> = {
 
 export async function POST(req: Request) {
   const { userId } = await auth()
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { plan, annual = false } = await req.json()
 
@@ -61,16 +59,19 @@ export async function POST(req: Request) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.agent7even.com'
 
+  // Only Starter gets a 3-day trial — Growth and ProAgent charge immediately
+  const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] = {
+    metadata: { clerk_user_id: userId, plan },
+    ...(plan === 'starter' ? { trial_period_days: 3 } : {}),
+  }
+
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/dashboard?upgraded=true`,
     cancel_url: `${appUrl}/pricing`,
-    subscription_data: {
-      trial_period_days: 7,
-      metadata: { clerk_user_id: userId, plan },
-    },
+    subscription_data: subscriptionData,
     allow_promotion_codes: true,
   })
 

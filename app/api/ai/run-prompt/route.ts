@@ -5,6 +5,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+const TRIAL_RUN_LIMIT = 5
+
 export async function POST(req: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -20,43 +22,77 @@ export async function POST(req: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, plan')
+    .select('id, plan, status, stripe_subscription_id')
     .eq('clerk_user_id', userId)
     .single()
 
   if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-  // Enforce Starter plan run limit (dynamic from platform_settings)
-  if (!profile.plan || profile.plan === 'starter') {
-    const { data: limitSetting } = await supabase
-      .from('platform_settings')
-      .select('value')
-      .eq('key', 'starter_ai_limit')
-      .single()
-    const STARTER_LIMIT = (limitSetting?.value as number) ?? 15
+  // Require active plan
+  if (!profile.plan || !['starter', 'growth', 'proagent'].includes(profile.plan)) {
+    return NextResponse.json({ error: 'No active plan', code: 'NO_PLAN' }, { status: 403 })
+  }
 
-    const startOfMonth = new Date()
-    startOfMonth.setDate(1)
-    startOfMonth.setHours(0, 0, 0, 0)
-
-    const { count } = await supabase
-      .from('ai_tool_usage')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', profile.id)
-      .gte('created_at', startOfMonth.toISOString())
-
-    if ((count ?? 0) >= STARTER_LIMIT) {
-      return NextResponse.json(
-        { error: 'Monthly limit reached. Upgrade to Growth for unlimited runs.' },
-        { status: 429 }
-      )
+  // Check if on trial (Starter only)
+  let onTrial = false
+  if (profile.plan === 'starter' && profile.stripe_subscription_id) {
+    try {
+      const { default: Stripe } = await import('stripe')
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: '2026-04-22.dahlia',
+      })
+      const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+      onTrial = subscription.status === 'trialing'
+    } catch {
+      // If we can't check, assume not on trial
     }
+  }
+
+  // Fetch platform settings for dynamic limits
+  const { data: limitSetting } = await supabase
+    .from('platform_settings')
+    .select('value')
+    .eq('key', 'starter_ai_limit')
+    .single()
+  const STARTER_LIMIT = (limitSetting?.value as number) ?? 15
+
+  // Count this month's usage
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+
+  const { count: monthlyRuns } = await supabase
+    .from('ai_tool_usage')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', profile.id)
+    .gte('created_at', startOfMonth.toISOString())
+
+  const runsUsed = monthlyRuns ?? 0
+
+  // Enforce trial limit (5 total runs ever, not per month)
+  if (onTrial) {
+    const { count: totalTrialRuns } = await supabase
+      .from('ai_tool_usage')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', profile.id)
+
+    if ((totalTrialRuns ?? 0) >= TRIAL_RUN_LIMIT) {
+      return NextResponse.json({
+        error: 'Trial AI limit reached. Upgrade to continue.',
+        code: 'TRIAL_LIMIT',
+      }, { status: 403 })
+    }
+  } else if (profile.plan === 'starter' && runsUsed >= STARTER_LIMIT) {
+    // Enforce monthly limit for paid Starter
+    return NextResponse.json({
+      error: 'Monthly AI limit reached. Upgrade to Growth for unlimited runs.',
+      code: 'MONTHLY_LIMIT',
+    }, { status: 403 })
   }
 
   // Build system prompt
   let systemPrompt = `You are an expert marketing copywriter. Write compelling, professional marketing content based on the user's request. Be specific, actionable, and ready to use.`
 
-  // Inject brand context if toggle is on
   if (useBrandVoice) {
     const { data: brandDocs } = await supabase
       .from('brand_documents')
@@ -77,7 +113,7 @@ ${personaDoc ? `## IDEAL CLIENT PROFILE\n${personaDoc.content}\n` : ''}
 
 ## YOUR INSTRUCTIONS
 - Always write in this brand's established voice and tone
-- Keep the ideal client profile in mind for every word you write  
+- Keep the ideal client profile in mind for every word you write
 - Reflect the brand's positioning and what makes them unique
 - Never use generic marketing language that could apply to any business
 - Make every output feel distinctly like this brand
@@ -86,7 +122,6 @@ Now complete the following task:`
     }
   }
 
-  // Run Claude
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1000,
@@ -96,7 +131,6 @@ Now complete the following task:`
 
   const output = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  // Log usage
   await supabase.from('ai_tool_usage').insert({
     user_id: profile.id,
     tool: 'prompt_library',
@@ -105,5 +139,5 @@ Now complete the following task:`
     time_saved_mins: timeSavedMins ?? 0,
   })
 
-  return NextResponse.json({ output })
+  return NextResponse.json({ output, onTrial, runsUsed: runsUsed + 1 })
 }
