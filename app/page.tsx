@@ -16,7 +16,7 @@ export default function HomePage() {
               Sign in
             </Link>
             <Link href="/sign-up" className="bg-[#c8522a] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#b04623] transition-colors">
-              Get started
+              Sign up
             </Link>
           </Show>
           <Show when="signed-in">

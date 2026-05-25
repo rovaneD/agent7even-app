@@ -16,7 +16,7 @@ const plans = [
     trial: true,
     trialDays: 3,
     billingNote: '3 days free — cancel anytime before being charged',
-    cta: 'Start free trial',
+    cta: 'Start your free trial',
     popular: false,
     features: [
       'Full client dashboard & portal',
