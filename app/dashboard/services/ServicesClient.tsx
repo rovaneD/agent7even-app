@@ -1,13 +1,24 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Globe, Hash, Camera, Mail, Search,
   Brush, Video, Megaphone, Plus, X, ChevronRight,
-  Clock, CheckCircle, AlertCircle, Loader2, ArrowRight
+  Clock, CheckCircle, AlertCircle, Loader2, ArrowRight, Code2
 } from 'lucide-react'
 
 const SERVICES = [
+  {
+    id: 'design_dev',
+    icon: Code2,
+    name: 'Design & Development',
+    desc: 'UI/UX design, mobile app development, and custom web builds. Tell us about your project and we\'ll send a custom proposal.',
+    price: 'Custom quote',
+    type: 'project',
+    deliveryDays: null,
+    requiresScope: true,
+  },
   {
     id: 'website',
     icon: Globe,
@@ -16,6 +27,7 @@ const SERVICES = [
     price: 'from $3,500',
     type: 'project',
     deliveryDays: 14,
+    requiresScope: false,
   },
   {
     id: 'social_media',
@@ -25,6 +37,7 @@ const SERVICES = [
     price: 'from $1,500/mo',
     type: 'retainer',
     deliveryDays: 7,
+    requiresScope: false,
   },
   {
     id: 'photography',
@@ -34,6 +47,7 @@ const SERVICES = [
     price: 'from $1,200/session',
     type: 'project',
     deliveryDays: 7,
+    requiresScope: false,
   },
   {
     id: 'email_marketing',
@@ -43,6 +57,7 @@ const SERVICES = [
     price: 'from $1,500',
     type: 'project',
     deliveryDays: 10,
+    requiresScope: false,
   },
   {
     id: 'seo',
@@ -52,6 +67,7 @@ const SERVICES = [
     price: 'from $1,200',
     type: 'project',
     deliveryDays: 10,
+    requiresScope: false,
   },
   {
     id: 'brand_identity',
@@ -61,6 +77,7 @@ const SERVICES = [
     price: 'from $3,000',
     type: 'project',
     deliveryDays: 14,
+    requiresScope: false,
   },
   {
     id: 'video_reels',
@@ -70,6 +87,7 @@ const SERVICES = [
     price: 'from $1,200/mo',
     type: 'retainer',
     deliveryDays: 5,
+    requiresScope: false,
   },
   {
     id: 'ad_management',
@@ -79,6 +97,7 @@ const SERVICES = [
     price: 'from $2,000/mo',
     type: 'retainer',
     deliveryDays: 7,
+    requiresScope: false,
   },
 ]
 
@@ -191,6 +210,7 @@ export default function ServicesClient({
   profile: Profile | null
   orders: Order[]
 }) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'browse' | 'orders'>('browse')
   const [requestingService, setRequestingService] = useState<typeof SERVICES[0] | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -297,7 +317,7 @@ export default function ServicesClient({
                 <p className="text-xs text-gray-400 leading-relaxed mb-4">{service.desc}</p>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-400">
-                    ~{service.deliveryDays} day delivery
+                    {service.deliveryDays ? `~${service.deliveryDays} day delivery` : 'Custom timeline'}
                   </span>
                   {hasActiveOrder ? (
                     <button
@@ -305,6 +325,13 @@ export default function ServicesClient({
                       className="flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-800 transition-colors"
                     >
                       View order <ArrowRight size={11} />
+                    </button>
+                  ) : service.requiresScope ? (
+                    <button
+                      onClick={() => router.push('/dashboard/services/inquiry')}
+                      className="flex items-center gap-1.5 text-xs font-medium text-[#c8522a] hover:text-[#b04623] transition-colors"
+                    >
+                      <ArrowRight size={12} /> Get a quote
                     </button>
                   ) : (
                     <button

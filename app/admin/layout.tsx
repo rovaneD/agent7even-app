@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import {
   LayoutDashboard, Users, ShoppingBag, Headphones,
-  CreditCard, Settings, ChevronRight, Menu, X, Shield,
+  CreditCard, Settings, ChevronRight, Menu, X, Shield, Inbox,
 } from 'lucide-react'
 
 const NAV = [
@@ -21,6 +21,7 @@ const NAV = [
     items: [
       { href: '/admin/clients', label: 'Clients', icon: Users },
       { href: '/admin/orders', label: 'Orders', icon: ShoppingBag },
+      { href: '/admin/inquiries', label: 'Inquiries', icon: Inbox },
       { href: '/admin/support', label: 'Support', icon: Headphones },
     ],
   },
