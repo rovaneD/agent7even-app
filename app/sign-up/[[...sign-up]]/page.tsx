@@ -1,13 +1,17 @@
 import { SignUp } from '@clerk/nextjs'
 import { Zap, BarChart2, Layers } from 'lucide-react'
 
+type Props = { searchParams: Promise<{ plan?: string }> }
+
 const highlights = [
   { icon: Zap, label: 'AI Toolkit', desc: 'Generate copy, campaigns, and strategy in seconds.' },
   { icon: BarChart2, label: 'Live Analytics', desc: 'Google Analytics, Instagram, and Meta in one view.' },
   { icon: Layers, label: 'Managed Services', desc: 'Request work and track deliverables from your team.' },
 ]
 
-export default function SignUpPage() {
+export default async function SignUpPage({ searchParams }: Props) {
+  const { plan } = await searchParams
+  const postSignUpRedirect = plan ? `/onboarding?plan=${plan}` : '/onboarding'
   return (
     <div className="min-h-screen flex bg-[#0d0d0d]">
 
@@ -54,6 +58,7 @@ export default function SignUpPage() {
         </a>
 
         <SignUp
+          forceRedirectUrl={postSignUpRedirect}
           appearance={{
             variables: {
               colorPrimary: '#c8522a',

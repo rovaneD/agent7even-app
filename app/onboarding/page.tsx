@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useUser } from '@clerk/nextjs'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Check, Loader2 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -89,9 +89,11 @@ const STEPS: Step[] = [
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function OnboardingPage() {
+function OnboardingInner() {
   const { user } = useUser()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const plan = searchParams.get('plan')
 
   const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
@@ -185,7 +187,7 @@ export default function OnboardingPage() {
       })
 
       if (!res.ok) throw new Error('Failed to save')
-      router.push('/dashboard')
+      router.push(plan ? `/checkout-now?plan=${plan}` : '/dashboard')
     } catch (err) {
       console.error(err)
       router.push('/dashboard')
@@ -378,5 +380,13 @@ export default function OnboardingPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense>
+      <OnboardingInner />
+    </Suspense>
   )
 }
