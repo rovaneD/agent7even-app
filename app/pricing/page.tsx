@@ -284,7 +284,77 @@ export default function PricingPage() {
             </a>
           </p>
         </div>
+
+        {/* Comparison table */}
+        <div className="mt-20">
+          <h2 className="text-center text-2xl font-semibold text-[#f5f4f0] tracking-tight mb-2">
+            Compare plans
+          </h2>
+          <p className="text-center text-sm text-white/30 mb-10">
+            Everything included in each tier, side by side.
+          </p>
+          <div className="overflow-x-auto rounded-2xl border border-white/8">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/8">
+                  <th className="text-left px-6 py-4 text-white/30 font-medium w-1/2">Feature</th>
+                  <th className="text-center px-6 py-4 text-[#f5f4f0] font-semibold">Starter</th>
+                  <th className="text-center px-6 py-4 text-[#c8522a] font-semibold bg-[#c8522a]/5">Growth</th>
+                  <th className="text-center px-6 py-4 text-[#f5f4f0] font-semibold">ProAgent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { feature: "Dashboard & client portal", starter: true, growth: true, proagent: true },
+                  { feature: "AI Toolkit", starter: "15 runs/mo", growth: "Unlimited", proagent: "Unlimited" },
+                  { feature: "Brand Kit", starter: false, growth: true, proagent: true },
+                  { feature: "Analytics", starter: "Basic", growth: "Full", proagent: "Full" },
+                  { feature: "Deliverables hub", starter: true, growth: true, proagent: true },
+                  { feature: "Active service requests", starter: "1", growth: "3", proagent: "Unlimited" },
+                  { feature: "Add-on discount", starter: "—", growth: "10% off", proagent: "15% off" },
+                  { feature: "Support", starter: "Email", growth: "Priority email", proagent: "Dedicated" },
+                  { feature: "Quarterly strategy review", starter: false, growth: false, proagent: true },
+                  { feature: "White-glove onboarding", starter: false, growth: false, proagent: true },
+                  { feature: "3-day free trial", starter: true, growth: false, proagent: false },
+                  { feature: "Annual billing option", starter: true, growth: true, proagent: true },
+                ].map((row, i) => (
+                  <tr key={row.feature} className={`border-b border-white/5 last:border-0 ${i % 2 === 0 ? "bg-white/[0.01]" : ""}`}>
+                    <td className="px-6 py-4 text-white/50">{row.feature}</td>
+                    <td className="px-6 py-4 text-center"><Cell value={row.starter} /></td>
+                    <td className="px-6 py-4 text-center bg-[#c8522a]/5"><Cell value={row.growth} highlight /></td>
+                    <td className="px-6 py-4 text-center"><Cell value={row.proagent} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/5 mt-4">
+        <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-6 text-sm text-white/30">
+            <span className="font-semibold tracking-widest uppercase text-[#c8522a] text-xs">Agent7even</span>
+            <a href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</a>
+            <a href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</a>
+            <a href="mailto:hello@agent7even.com" className="hover:text-white/60 transition-colors">hello@agent7even.com</a>
+          </div>
+          <p className="text-xs text-white/20">© {new Date().getFullYear()} Agent7even. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   )
+}
+
+function Cell({ value, highlight = false }: { value: boolean | string; highlight?: boolean }) {
+  if (value === true) {
+    return (
+      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${highlight ? "bg-[#c8522a]/20" : "bg-white/10"}`}>
+        <Check size={11} className={highlight ? "text-[#c8522a]" : "text-white/50"} />
+      </span>
+    )
+  }
+  if (value === false) return <span className="text-white/15">—</span>
+  return <span className={`font-medium ${highlight ? "text-[#c8522a]" : "text-white/60"}`}>{value}</span>
 }
