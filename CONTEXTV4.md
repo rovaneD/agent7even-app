@@ -17,7 +17,7 @@ Lower versions serve as a changelog and roadmap audit trail.
 | V1 | May 2025 | Initial build — auth, onboarding, dashboard, Stripe (3 plans), services, AI toolkit, admin panel |
 | V2 | May 2025 | Strategic shift to subscription SaaS model — 3 tiers (Starter/Growth/ProAgent), welcome email added, analytics tab built (GA OAuth), privacy/terms pages, pricing redesign queued |
 | V3 | May 2025 | Stripe billing redesign shipped. AI Toolkit plan gating. Sign-in/sign-up redesigned. Meta/Instagram OAuth. Analytics tab fully merged. Brand Kit built (6-chapter flow, 4 Claude-generated documents, inline editing, version history). Brand voice injected into AI Toolkit. |
-| V4 | May 2026 | Deliverables tab, Support tab (threaded), Admin Revenue, Admin Settings (full control center), Client Settings, Brand Kit in Admin, Trial strategy (Starter only, 3 days, 5 AI runs, Brand Kit locked), Marketing site updated (new copy, pricing, chatbot system prompt), Platform settings table, Services table seeded, Integrations roadmap added. Deployment safeguards added (pre-push hook, CI workflow, vercel.json). Pricing page hardened (3-day trial badge, Start your free trial CTA, comparison table with Brand Kit row). CTA copy standardised across both sites. Marketing site copy refreshed (HowItWorks, ProofBar icons, hero pill badge removed, Website Building description). Settings fixes (Clerk modal, inline error, revalidatePath, router.refresh). Meta callback fixed (preserves manual instagram_handle). Instagram insights empty state improved. GA4 added to app. GA4 key events wired (sign_up_click, pricing_view, plan_selected) across both sites. |
+| V4 | May 2026 | Deliverables tab, Support tab (threaded), Admin Revenue, Admin Settings (full control center), Client Settings, Brand Kit in Admin, Trial strategy (Starter only, 3 days, 5 AI runs, Brand Kit locked), Marketing site updated (new copy, pricing, chatbot system prompt), Platform settings table, Services table seeded, Integrations roadmap added. Deployment safeguards added (pre-push hook, CI workflow, vercel.json). Pricing page hardened (3-day trial badge, Start your free trial CTA, comparison table with Brand Kit row). CTA copy standardised across both sites. Marketing site copy refreshed (HowItWorks, ProofBar icons, hero pill badge removed, Website Building description). Settings fixes (Clerk modal, inline error, revalidatePath, router.refresh). Meta callback fixed (preserves manual instagram_handle). Instagram insights empty state improved. GA4 added to app. GA4 key events wired (sign_up_click, pricing_view, plan_selected) across both sites. Blog fully updated — Book a free call removed, CTAs → Start your free trial, BlogNav → Sign up, Pricing link → app, service card prices stripped from all 9 posts, AI Sprint references replaced with AI Toolkit/Agent7even. |
 
 ---
 
@@ -657,6 +657,29 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`.
 
 ---
 
+## Blog (`~/agent7even`)
+
+Blog lives at `agent7even.com/blog` — 9 published posts, content in `src/content/blog/*.mdx`.
+
+### Nav (`src/components/blog/BlogNav.tsx`)
+- All CTA buttons: "Sign up" → `https://app.agent7even.com/sign-up`
+- Pricing nav link: `https://app.agent7even.com/pricing`
+
+### Blog index (`src/app/blog/page.tsx`)
+- Bottom CTA: "Start your free trial →" → `app.agent7even.com/sign-up`
+
+### Blog article (`src/app/blog/[slug]/page.tsx`)
+- Service card CTA: "Start your free trial →" → `app.agent7even.com/sign-up`
+- Service card body: "Available as an add-on inside your Agent7even dashboard…"
+- No prices shown anywhere in the article template
+
+### MDX frontmatter rules
+- `service:` field: name only — no prices (e.g. `"Website Building"` not `"Website Building — from $3,500"`)
+- Never reference "AI Sprint", "Growth package", or "Done For You retainer" — these are old model names
+- Service names must match the 8 add-on services: `AI Toolkit`, `Website Building`, `Social Media Management`, `Product Photography`, `Email Marketing Setup`, `SEO Basics`, `Brand Identity & Logo`, `Ad Management`
+
+---
+
 ## CTA Copy Standard (both sites)
 
 | Context | Copy |
@@ -705,6 +728,10 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`.
 - [x] Instagram empty state — replaced confusing error with "Instagram insights coming soon" message
 - [x] GA4 on app — `G-8913QV8Z1M` added to `app/layout.tsx` via `next/script afterInteractive`
 - [x] GA4 key events — `sign_up_click` (hero + CTA section), `pricing_view` (hero link + pricing page load), `plan_selected` (pricing page checkout click with plan + billing params)
+- [x] Blog — `BlogNav` "Book a free call" → "Sign up" → `app.agent7even.com/sign-up` (all 3 variants: desktop, mobile, post), Pricing link → `app.agent7even.com/pricing`
+- [x] Blog index — bottom CTA "Book a free call →" → "Start your free trial →" with updated body copy
+- [x] Blog article — service card "Book a free call →" → "Start your free trial →", body copy updated to reference dashboard add-ons
+- [x] Blog MDX files — all 9 posts: `service:` frontmatter prices stripped (e.g. "from $3,500", "$2,500 flat"), "AI Sprint" → "AI Toolkit" / "Agent7even platform" in 2 posts
 
 ---
 
