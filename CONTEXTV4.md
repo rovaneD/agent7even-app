@@ -17,7 +17,7 @@ Lower versions serve as a changelog and roadmap audit trail.
 | V1 | May 2025 | Initial build — auth, onboarding, dashboard, Stripe (3 plans), services, AI toolkit, admin panel |
 | V2 | May 2025 | Strategic shift to subscription SaaS model — 3 tiers (Starter/Growth/ProAgent), welcome email added, analytics tab built (GA OAuth), privacy/terms pages, pricing redesign queued |
 | V3 | May 2025 | Stripe billing redesign shipped. AI Toolkit plan gating. Sign-in/sign-up redesigned. Meta/Instagram OAuth. Analytics tab fully merged. Brand Kit built (6-chapter flow, 4 Claude-generated documents, inline editing, version history). Brand voice injected into AI Toolkit. |
-| V4 | May 2026 | Deliverables tab, Support tab (threaded), Admin Revenue, Admin Settings (full control center), Client Settings, Brand Kit in Admin, Trial strategy (Starter only, 3 days, 5 AI runs, Brand Kit locked), Marketing site updated (new copy, pricing, chatbot system prompt), Platform settings table, Services table seeded, Integrations roadmap added. Deployment safeguards added (pre-push hook, CI workflow, vercel.json). Pricing page hardened (3-day trial badge, Start your free trial CTA, comparison table with Brand Kit row). CTA copy standardised across both sites. Marketing site copy refreshed (HowItWorks, ProofBar icons, hero pill badge removed, Website Building description). |
+| V4 | May 2026 | Deliverables tab, Support tab (threaded), Admin Revenue, Admin Settings (full control center), Client Settings, Brand Kit in Admin, Trial strategy (Starter only, 3 days, 5 AI runs, Brand Kit locked), Marketing site updated (new copy, pricing, chatbot system prompt), Platform settings table, Services table seeded, Integrations roadmap added. Deployment safeguards added (pre-push hook, CI workflow, vercel.json). Pricing page hardened (3-day trial badge, Start your free trial CTA, comparison table with Brand Kit row). CTA copy standardised across both sites. Marketing site copy refreshed (HowItWorks, ProofBar icons, hero pill badge removed, Website Building description). Settings fixes (Clerk modal, inline error, revalidatePath, router.refresh). Meta callback fixed (preserves manual instagram_handle). Instagram insights empty state improved. GA4 added to app. GA4 key events wired (sign_up_click, pricing_view, plan_selected) across both sites. |
 
 ---
 
@@ -572,6 +572,18 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`.
 - Email flows: new ticket → admin, admin reply → client, ticket closed → client
 - Admin can change priority and status inline
 
+### Client Settings — save + refresh pattern
+- `app/api/settings/update/route.ts` calls `revalidatePath('/dashboard/settings')` and `revalidatePath('/dashboard/analytics')` after a successful Supabase update
+- `SettingsClient.tsx` calls `router.refresh()` immediately after `setSaved(true)` — forces Next.js to re-fetch server data without a full page reload
+- "Account settings" link opens the Clerk `openUserProfile()` modal inline (not a link to clerk.com)
+- Error state appears inline below the Instagram handle field with red border, not at the bottom of the form
+
+### Instagram handle — source of truth
+- Manually set in `/dashboard/settings` — stored as `profiles.instagram_handle`
+- Meta OAuth callback (`api/analytics/meta-callback/route.ts`) fetches the connected IG username and writes it — BUT only if a username was returned (`...(igHandle ? { instagram_handle: igHandle } : {})`)
+- If Meta OAuth returns no IG username, the manually-entered value is preserved
+- Instagram insights empty state shows "Instagram insights coming soon" — not an error message
+
 ### Lucide icons
 `Instagram` icon doesn't exist — use `Hash`. Brand logos: `/public/google_analytics_icon.png`, `/instagram-logo.png`, `/MetaLogo.png`.
 
@@ -614,6 +626,34 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`.
 ### Chatbot
 - System prompt updated to SaaS model — 3 tiers, correct prices, `app.agent7even.com` CTAs
 - Auto-improvement cron (`improve-prompt/route.ts`) meta-prompt updated to preserve plan names, prices, trial, links
+
+---
+
+## GA4 Tracking
+
+**Property ID:** `G-8913QV8Z1M` — shared across both sites (marketing + app)
+
+### Marketing site (`~/agent7even`)
+- Script in `src/app/layout.tsx` (inline `<script>` in `<head>`)
+- Helper: `src/lib/gtag.ts` — exports `trackEvent({ action, category, label, value })`
+- Type declaration: `src/types/gtag.d.ts` — `window.gtag` and `window.dataLayer`
+
+### App (`app.agent7even.com`)
+- Script in `app/layout.tsx` via `next/script strategy="afterInteractive"`
+- Type declaration: `types/gtag.d.ts`
+- Inline `trackEvent` helper in `app/pricing/page.tsx`
+
+### Key events wired
+
+| Event | Site | Fires when | Params |
+|---|---|---|---|
+| `sign_up_click` | Marketing hero | "Start your free trial" clicked | `category: 'hero'` |
+| `sign_up_click` | Marketing CTA section | "Start your free trial →" clicked | `category: 'cta_section'` |
+| `pricing_view` | Marketing hero | "See what's included" clicked | `category: 'hero'` |
+| `pricing_view` | App pricing page | Page loads | `page: 'pricing'` |
+| `plan_selected` | App pricing page | Any plan CTA clicked | `plan`, `billing` (monthly/annual) |
+
+**To activate in GA4 dashboard:** Admin → Events → find each event name → "Mark as key event". GA collects the events automatically once deployed; marking them makes them appear in the Key Events count.
 
 ---
 
@@ -660,6 +700,11 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`.
 - [x] Google OAuth verified + published
 - [x] Deployment safeguards — pre-push hook, CI workflow, vercel.json, AGENTS.md rules
 - [x] Marketing site — all copy, CTAs, HowItWorks, ProofBar icons, hero, add-ons updated
+- [x] Settings page — Clerk `openUserProfile()` modal, inline error on Instagram field, `revalidatePath` + `router.refresh()` after save
+- [x] Meta callback — preserves manually-entered `instagram_handle` if OAuth returns no IG username
+- [x] Instagram empty state — replaced confusing error with "Instagram insights coming soon" message
+- [x] GA4 on app — `G-8913QV8Z1M` added to `app/layout.tsx` via `next/script afterInteractive`
+- [x] GA4 key events — `sign_up_click` (hero + CTA section), `pricing_view` (hero link + pricing page load), `plan_selected` (pricing page checkout click with plan + billing params)
 
 ---
 
