@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
@@ -25,6 +26,9 @@ export async function POST(req: Request) {
     console.error('Settings update error:', error)
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
   }
+
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard/analytics')
 
   return NextResponse.json({ success: true })
 }

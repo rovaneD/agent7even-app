@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useClerk } from '@clerk/nextjs'
 import { Save, Loader2, CheckCircle, AlertCircle, User, Building, Globe, Hash } from 'lucide-react'
 
@@ -36,6 +37,7 @@ function planBadge(plan: string | null) {
 }
 
 export default function SettingsClient({ profile }: Props) {
+  const router = useRouter()
   const { openUserProfile } = useClerk()
   const [companyName, setCompanyName] = useState(profile.company_name ?? '')
   const [websiteUrl, setWebsiteUrl] = useState(profile.website_url ?? '')
@@ -61,6 +63,7 @@ export default function SettingsClient({ profile }: Props) {
       })
       if (!res.ok) throw new Error('Failed to save')
       setSaved(true)
+      router.refresh()
       setTimeout(() => setSaved(false), 3000)
     } catch {
       setError('Failed to save changes. Please try again.')
