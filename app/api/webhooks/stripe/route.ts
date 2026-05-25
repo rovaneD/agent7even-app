@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createNotification } from '@/lib/createNotification'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-04-22.dahlia',
@@ -71,7 +72,27 @@ export async function POST(req: Request) {
       })
       .eq('clerk_user_id', clerkUserId)
 
-    if (error) console.error('Supabase update error (checkout.session.completed):', error)
+    if (error) {
+      console.error('Supabase update error (checkout.session.completed):', error)
+    } else {
+      // Notify client — plan is now active
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('clerk_user_id', clerkUserId)
+        .single()
+
+      if (newProfile) {
+        await createNotification({
+          userId: newProfile.id,
+          title: 'Welcome to Agent7even!',
+          body: `Your ${plan} plan is now active. You have full access to your dashboard.`,
+          type: 'plan_activated',
+          link: '/dashboard',
+          sendEmail: false, // welcome email already sent via Clerk webhook
+        })
+      }
+    }
   }
 
   // ── customer.subscription.updated ──────────────────────────────────────────

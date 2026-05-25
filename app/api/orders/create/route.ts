@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getNotifyEmail } from '@/lib/getNotifyEmail'
+import { createNotification } from '@/lib/createNotification'
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,14 +45,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Create notification for admin
-    await supabase.from('notifications').insert({
-      user_id: profile.id,
+    // Notify client — request confirmed
+    await createNotification({
+      userId: profile.id,
       title: 'Service request submitted',
       body: `Your ${title} request has been submitted. We'll be in touch within 1 business day.`,
-      type: 'order',
-      link: `/dashboard/services`,
+      type: 'order_status',
+      link: '/dashboard/services',
+      sendEmail: false,
     })
+
+    // Notify admin — fetch first admin/owner profile
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin', 'owner'])
+      .limit(1)
+      .single()
+
+    if (adminProfile) {
+      await createNotification({
+        userId: adminProfile.id,
+        title: 'New service request',
+        body: `${profile.company_name ?? profile.full_name} submitted a new ${title} request.`,
+        type: 'order_status',
+        link: `/admin/clients/${profile.id}`,
+        sendEmail: false,
+      })
+    }
 
     // Notify admin via email
     const notifyEmail = await getNotifyEmail()

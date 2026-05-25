@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createNotification } from '@/lib/createNotification'
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -37,14 +38,26 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Notify the client when status changes to delivered
-  if (status === 'delivered') {
-    const { data: order } = await supabase
-      .from('orders')
-      .select('user_id, title, profiles(email, full_name)')
-      .eq('id', order_id)
-      .single() as any
+  // Notify the client on status changes
+  const { data: order } = await supabase
+    .from('orders')
+    .select('user_id, title, profiles(email, full_name)')
+    .eq('id', order_id)
+    .single() as any
 
+  if (order?.user_id) {
+    await createNotification({
+      userId: order.user_id,
+      title: status === 'delivered' ? 'Your order has been delivered!' : 'Order status updated',
+      body: `Your ${order.title} order is now ${status.replace(/_/g, ' ')}.`,
+      type: status === 'delivered' ? 'order_delivered' : 'order_status',
+      link: '/dashboard/services',
+      sendEmail: status === 'delivered',
+      emailSubject: `Your ${order.title} has been delivered`,
+    })
+  }
+
+  if (status === 'delivered') {
     if (order?.profiles?.email) {
       try {
         const { Resend } = await import('resend')

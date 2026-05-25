@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/server'
 import { DOCUMENT_TYPES } from '@/app/dashboard/brand-kit/questions'
+import { createNotification } from '@/lib/createNotification'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -193,6 +194,15 @@ export async function POST(req: Request) {
       }
     })
   )
+
+  await createNotification({
+    userId: profile.id,
+    title: 'Your Brand Kit is ready',
+    body: 'Your Brand Voice Statement, Brand Story, Ideal Client Profile, and Positioning Statement have been generated.',
+    type: 'brand_kit_generated',
+    link: '/dashboard/brand-kit',
+    sendEmail: false,
+  })
 
   return NextResponse.json({ documents: savedDocuments.filter(Boolean) })
 }

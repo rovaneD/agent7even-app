@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createNotification } from '@/lib/createNotification'
 
 export async function POST(req: Request) {
   const { userId } = await auth()
@@ -69,6 +70,16 @@ export async function POST(req: Request) {
     console.error('DB insert error:', dbError)
     return NextResponse.json({ error: 'Failed to save file record.' }, { status: 500 })
   }
+
+  await createNotification({
+    userId: clientId,
+    title: 'New deliverable uploaded',
+    body: `${file.name} has been added to your ${projectName} folder.`,
+    type: 'deliverable_uploaded',
+    link: '/dashboard/deliverables',
+    sendEmail: true,
+    emailSubject: `New file delivered: ${file.name}`,
+  })
 
   return NextResponse.json({ deliverable })
 }

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 import { getNotifyEmail } from '@/lib/getNotifyEmail'
+import { createNotification } from '@/lib/createNotification'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -57,6 +58,38 @@ export async function POST(req: Request) {
     .from('support_tickets')
     .update({ updated_at: new Date().toISOString() })
     .eq('id', ticketId)
+
+  // In-app notification for the other party
+  if (isAdmin) {
+    // Notify the client
+    await createNotification({
+      userId: ticket.user_id,
+      title: 'New reply on your support ticket',
+      body: `Agent7even replied to: ${ticket.subject}`,
+      type: 'support_reply',
+      link: '/dashboard/support',
+      sendEmail: false, // email handled below
+    })
+  } else {
+    // Notify admin
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin', 'owner'])
+      .limit(1)
+      .single()
+
+    if (adminProfile) {
+      await createNotification({
+        userId: adminProfile.id,
+        title: 'New reply on support ticket',
+        body: `${profile.full_name} replied to: ${ticket.subject}`,
+        type: 'support_reply',
+        link: `/admin/support/${ticketId}`,
+        sendEmail: false, // email handled below
+      })
+    }
+  }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.agent7even.com'
 
