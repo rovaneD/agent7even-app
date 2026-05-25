@@ -1,203 +1,379 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Zap, TrendingUp, Star } from 'lucide-react'
+import { useUser } from '@clerk/nextjs'
 
-const PLANS = [
+const plans = [
   {
-    id: 'ai_sprint',
-    name: 'AI Sprint',
-    badge: 'Starter',
-    price: '$3,500',
-    period: 'one-time',
-    description: 'Get your core AI systems set up and running in two weeks.',
-    featured: false,
-    items: [
-      'Workflow audit & bottleneck mapping',
-      'Custom AI prompt library',
-      '2–3 core workflows built & tested',
-      '60-min team training session',
-      '1-week post-launch check-in',
+    key: 'starter',
+    name: 'Starter',
+    icon: Zap,
+    monthlyPrice: 49,
+    annualPrice: 490,
+    description: 'Everything you need to get started with smart marketing automation.',
+    color: 'gray',
+    features: [
+      'Full client dashboard & portal',
+      'AI Toolkit — 15 runs/month',
+      'Analytics & reporting',
+      'Deliverables hub',
+      '1 active service request',
+      'Email support',
+      'Add-on services available',
     ],
+    cta: 'Get started',
+    popular: false,
   },
   {
-    id: 'growth',
+    key: 'growth',
     name: 'Growth',
-    badge: 'Most popular',
-    price: '$7,500',
-    period: 'one-time',
-    description: 'AI sprint plus the highest-leverage creative services for growing businesses.',
-    featured: true,
-    items: [
-      'Everything in AI Sprint',
-      'Brand identity & logo design',
-      '5-page website built & launched',
-      'Email marketing setup & templates',
-      'SEO foundations configured',
-      '30-day post-launch support',
+    icon: TrendingUp,
+    monthlyPrice: 89,
+    annualPrice: 890,
+    description: 'Unlimited AI, more active projects, and priority support for growing businesses.',
+    color: 'orange',
+    features: [
+      'Everything in Starter',
+      'AI Toolkit — unlimited runs',
+      '3 active service requests',
+      'Priority email support',
+      '10% discount on add-on services',
+      'Advanced analytics',
+      'Early access to new features',
     ],
+    cta: 'Get started',
+    popular: true,
   },
   {
-    id: 'done_for_you',
-    name: 'Done For You',
-    badge: 'Full stack',
-    price: '$5,000',
-    period: '/month',
-    description: 'We handle everything — brand, content, and ads — on an ongoing basis.',
-    featured: false,
-    items: [
+    key: 'proagent',
+    name: 'ProAgent',
+    icon: Star,
+    monthlyPrice: 149,
+    annualPrice: 1490,
+    description: 'Unlimited everything, dedicated support, and maximum add-on savings.',
+    color: 'dark',
+    features: [
       'Everything in Growth',
-      'Social media management',
-      'Monthly product photography',
-      'Reels & video editing',
-      'Ad management (Meta & Google)',
-      'Weekly performance reports',
+      'Unlimited active service requests',
+      'Dedicated account support',
+      '15% discount on add-on services',
+      'Quarterly strategy review',
+      'White-glove onboarding',
+      'First access to beta features',
     ],
+    cta: 'Get started',
+    popular: false,
   },
 ]
 
 export default function PricingPage() {
-  const router = useRouter()
+  const [annual, setAnnual] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
+  const { isSignedIn } = useUser()
 
-  const handleCheckout = async (planId: string) => {
-    setLoading(planId)
+  async function handleCheckout(planKey: string) {
+    setLoading(planKey)
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planId }),
+        body: JSON.stringify({ plan: planKey, annual }),
       })
       const data = await res.json()
       if (data.url) {
         window.location.href = data.url
+      } else {
+        setLoading(null)
       }
-    } catch (err) {
-      console.error(err)
-    } finally {
+    } catch {
       setLoading(null)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d0d0d] text-[#f5f4f0]">
 
       {/* Nav */}
-      <header className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between">
-        <span className="font-bold text-sm tracking-wide text-gray-900">
-          AGENT<span className="text-[#c8522a]">7</span>EVEN
-        </span>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          ← Back to dashboard
-        </button>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-8 py-16">
-
-        {/* Header */}
-        <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest uppercase text-[#c8522a] mb-3">
-            Pricing
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">
-            Choose your plan
-          </h1>
-          <p className="text-gray-500 text-sm max-w-md mx-auto">
-            Start with what you need. Scale as you grow.
-            All plans include access to the Agent7even dashboard.
-          </p>
-        </div>
-
-        {/* Plans */}
-        <div className="grid grid-cols-3 gap-4 items-start">
-          {PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              className={`rounded-2xl overflow-hidden border transition-all ${
-                plan.featured
-                  ? 'border-[#c8522a] border-[1.5px] shadow-lg shadow-[#c8522a]/10'
-                  : 'border-gray-100 bg-white'
-              }`}
+      <nav className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+        <a href="/" className="text-sm font-semibold tracking-widest uppercase text-[#c8522a]">
+          Agent7even
+        </a>
+        <div className="flex items-center gap-6">
+          {isSignedIn ? (
+            <a
+              href="/dashboard"
+              className="text-sm font-medium bg-white/10 hover:bg-white/15 px-4 py-2 rounded-lg transition-colors"
             >
-              {/* Head */}
-              <div className={`px-6 pt-6 pb-5 border-b ${
-                plan.featured
-                  ? 'bg-[#0d0d0d] border-[#1a1a1a]'
-                  : 'bg-white border-gray-100'
-              }`}>
-                <span className={`text-[10px] font-semibold tracking-widest uppercase block mb-2 ${
-                  plan.featured ? 'text-[#c8522a]' : 'text-[#c8522a]'
-                }`}>
-                  {plan.badge}
-                </span>
-                <div className={`text-xl font-bold mb-1.5 ${
-                  plan.featured ? 'text-white' : 'text-gray-900'
-                }`}>
-                  {plan.name}
-                </div>
-                <div className={`text-xs leading-relaxed font-light mb-4 ${
-                  plan.featured ? 'text-gray-500' : 'text-gray-500'
-                }`}>
-                  {plan.description}
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-3xl font-bold ${
-                    plan.featured ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    {plan.price}
-                  </span>
-                  <span className={`text-xs ${
-                    plan.featured ? 'text-gray-500' : 'text-gray-400'
-                  }`}>
-                    {plan.period}
-                  </span>
+              Go to dashboard →
+            </a>
+          ) : (
+            <>
+              <a href="/sign-in" className="text-sm text-white/40 hover:text-white/70 transition-colors">
+                Sign in
+              </a>
+              <a
+                href="/sign-up"
+                className="text-sm font-medium bg-white/10 hover:bg-white/15 px-4 py-2 rounded-lg transition-colors"
+              >
+                Sign up
+              </a>
+            </>
+          )}
+        </div>
+      </nav>
+
+      {/* Header */}
+      <div className="max-w-4xl mx-auto px-6 pt-20 pb-12 text-center">
+        <p className="text-xs font-semibold tracking-widest uppercase text-[#c8522a] mb-4">
+          Pricing
+        </p>
+        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight mb-5">
+          Simple, transparent pricing
+        </h1>
+        <p className="text-lg text-white/40 max-w-xl mx-auto mb-10">
+          One platform for your marketing dashboard, AI tools, and managed services.
+          No contracts. Cancel anytime.
+        </p>
+
+        {/* Toggle */}
+        <div className="inline-flex items-center gap-3 bg-white/5 rounded-xl p-1">
+          <button
+            onClick={() => setAnnual(false)}
+            className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
+              !annual ? 'bg-white text-[#0d0d0d]' : 'text-white/50 hover:text-white/70'
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setAnnual(true)}
+            className={`text-sm font-medium px-5 py-2 rounded-lg transition-all flex items-center gap-2 ${
+              annual ? 'bg-white text-[#0d0d0d]' : 'text-white/50 hover:text-white/70'
+            }`}
+          >
+            Annual
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full transition-colors ${
+              annual ? 'bg-[#c8522a] text-white' : 'bg-white/10 text-white/50'
+            }`}>
+              2 months free
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Plans */}
+      <div className="max-w-6xl mx-auto px-6 pb-24">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map((plan) => {
+            const Icon = plan.icon
+            const isLoading = loading === plan.key
+
+            return (
+              <div
+                key={plan.key}
+                className={`relative rounded-2xl border flex flex-col ${
+                  plan.popular
+                    ? 'bg-[#c8522a] border-[#c8522a]'
+                    : 'bg-white/[0.03] border-white/10 hover:border-white/20'
+                } transition-all`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                    <span className="bg-[#f5f4f0] text-[#0d0d0d] text-xs font-bold px-4 py-1.5 rounded-full tracking-wide uppercase">
+                      Most popular
+                    </span>
+                  </div>
+                )}
+
+                <div className="p-8 flex flex-col flex-1">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      plan.popular ? 'bg-white/20' : 'bg-white/5'
+                    }`}>
+                      <Icon size={17} className={plan.popular ? 'text-white' : 'text-white/60'} />
+                    </div>
+                    <h3 className={`text-lg font-semibold ${plan.popular ? 'text-white' : 'text-[#f5f4f0]'}`}>
+                      {plan.name}
+                    </h3>
+                  </div>
+
+                  <div className="mb-2">
+                    <div className="flex items-end gap-1.5">
+                      <span className={`text-4xl font-semibold tracking-tight ${plan.popular ? 'text-white' : 'text-[#f5f4f0]'}`}>
+                        ${annual ? Math.round(plan.annualPrice / 12) : plan.monthlyPrice}
+                      </span>
+                      <span className={`text-sm mb-1.5 ${plan.popular ? 'text-white/60' : 'text-white/30'}`}>
+                        /mo
+                      </span>
+                    </div>
+                    {annual && (
+                      <p className={`text-xs mt-1 ${plan.popular ? 'text-white/70' : 'text-white/30'}`}>
+                        ${plan.annualPrice} billed annually
+                      </p>
+                    )}
+                  </div>
+
+                  <p className={`text-sm mb-8 leading-relaxed ${plan.popular ? 'text-white/70' : 'text-white/40'}`}>
+                    {plan.description}
+                  </p>
+
+                  <ul className="space-y-3 flex-1 mb-8">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3">
+                        <div className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center mt-0.5 ${
+                          plan.popular ? 'bg-white/20' : 'bg-white/10'
+                        }`}>
+                          <Check size={10} className={plan.popular ? 'text-white' : 'text-white/60'} />
+                        </div>
+                        <span className={`text-sm leading-snug ${plan.popular ? 'text-white/80' : 'text-white/50'}`}>
+                          {feature}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={() => handleCheckout(plan.key)}
+                    disabled={isLoading}
+                    className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                      plan.popular
+                        ? 'bg-white text-[#c8522a] hover:bg-[#f5f4f0]'
+                        : 'bg-white/10 text-[#f5f4f0] hover:bg-white/15 border border-white/10'
+                    }`}
+                  >
+                    {isLoading ? 'Redirecting...' : plan.cta}
+                  </button>
                 </div>
               </div>
-
-              {/* Body */}
-              <div className="bg-white px-6 py-5">
-                <ul className="space-y-2.5 mb-6">
-                  {plan.items.map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm text-gray-500">
-                      <Check size={14} className="text-[#c8522a] flex-shrink-0 mt-0.5" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => handleCheckout(plan.id)}
-                  disabled={loading === plan.id}
-                  className={`w-full py-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                    plan.featured
-                      ? 'bg-[#c8522a] text-white hover:bg-[#b04623]'
-                      : 'border border-gray-200 text-gray-800 hover:border-gray-400'
-                  } disabled:opacity-50`}
-                >
-                  {loading === plan.id ? (
-                    <><Loader2 size={14} className="animate-spin" /> Processing...</>
-                  ) : (
-                    'Get started'
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
-        {/* Trust line */}
-        <p className="text-center text-xs text-gray-400 mt-8">
-          Secure payment via Stripe · Cancel anytime (Done For You) · Questions?{' '}
-          <a href="mailto:hello@agent7even.com" className="text-[#c8522a] hover:underline">
+        <p className="text-center text-sm text-white/20 mt-10">
+          All plans include a 7-day free trial — cancel anytime before being charged.
+          Questions?{' '}
+          <a href="mailto:hello@agent7even.com" className="text-white/40 hover:text-white/60 underline underline-offset-2">
             hello@agent7even.com
           </a>
         </p>
 
-      </main>
+        {/* Comparison table */}
+        <div className="mt-20">
+          <h2 className="text-center text-2xl font-semibold text-[#f5f4f0] tracking-tight mb-2">
+            Compare plans
+          </h2>
+          <p className="text-center text-sm text-white/30 mb-10">
+            Everything included in each tier, side by side.
+          </p>
+
+          <div className="overflow-x-auto rounded-2xl border border-white/8">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/8">
+                  <th className="text-left px-6 py-4 text-white/30 font-medium w-1/2">Feature</th>
+                  <th className="text-center px-6 py-4 text-[#f5f4f0] font-semibold">Starter</th>
+                  <th className="text-center px-6 py-4 text-[#c8522a] font-semibold bg-[#c8522a]/5">Growth</th>
+                  <th className="text-center px-6 py-4 text-[#f5f4f0] font-semibold">ProAgent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  {
+                    feature: 'Dashboard & client portal',
+                    starter: true, growth: true, proagent: true,
+                  },
+                  {
+                    feature: 'AI Toolkit',
+                    starter: '15 runs/mo', growth: 'Unlimited', proagent: 'Unlimited',
+                  },
+                  {
+                    feature: 'Analytics',
+                    starter: 'Basic', growth: 'Full', proagent: 'Full',
+                  },
+                  {
+                    feature: 'Deliverables hub',
+                    starter: true, growth: true, proagent: true,
+                  },
+                  {
+                    feature: 'Active service requests',
+                    starter: '1', growth: '3', proagent: 'Unlimited',
+                  },
+                  {
+                    feature: 'Add-on discount',
+                    starter: '—', growth: '10% off', proagent: '15% off',
+                  },
+                  {
+                    feature: 'Support',
+                    starter: 'Email', growth: 'Priority email', proagent: 'Dedicated',
+                  },
+                  {
+                    feature: 'Quarterly strategy review',
+                    starter: false, growth: false, proagent: true,
+                  },
+                  {
+                    feature: 'White-glove onboarding',
+                    starter: false, growth: false, proagent: true,
+                  },
+                  {
+                    feature: 'Annual billing option',
+                    starter: true, growth: true, proagent: true,
+                  },
+                ].map((row, i) => (
+                  <tr
+                    key={row.feature}
+                    className={`border-b border-white/5 last:border-0 ${i % 2 === 0 ? 'bg-white/[0.01]' : ''}`}
+                  >
+                    <td className="px-6 py-4 text-white/50">{row.feature}</td>
+                    <td className="px-6 py-4 text-center">
+                      <Cell value={row.starter} />
+                    </td>
+                    <td className="px-6 py-4 text-center bg-[#c8522a]/5">
+                      <Cell value={row.growth} highlight />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Cell value={row.proagent} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/5 mt-4">
+        <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-6 text-sm text-white/30">
+            <span className="font-semibold tracking-widest uppercase text-[#c8522a] text-xs">Agent7even</span>
+            <a href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</a>
+            <a href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</a>
+            <a href="mailto:hello@agent7even.com" className="hover:text-white/60 transition-colors">hello@agent7even.com</a>
+          </div>
+          <p className="text-xs text-white/20">© {new Date().getFullYear()} Agent7even. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
+  )
+}
+
+function Cell({ value, highlight = false }: { value: boolean | string; highlight?: boolean }) {
+  if (value === true) {
+    return (
+      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${
+        highlight ? 'bg-[#c8522a]/20' : 'bg-white/10'
+      }`}>
+        <Check size={11} className={highlight ? 'text-[#c8522a]' : 'text-white/50'} />
+      </span>
+    )
+  }
+  if (value === false) {
+    return <span className="text-white/15">—</span>
+  }
+  return (
+    <span className={`font-medium ${highlight ? 'text-[#c8522a]' : 'text-white/60'}`}>
+      {value}
+    </span>
   )
 }
