@@ -972,9 +972,11 @@ export default function AnalyticsClient({
               </ResponsiveContainer>
             </>
           ) : (
-            <div className="h-40 flex items-center justify-center text-center px-8">
-              <p className="text-sm text-gray-400">
-                No Instagram data found. Make sure your Instagram account is a Business account connected to a Facebook Page.
+            <div className="h-40 flex flex-col items-center justify-center text-center px-8 gap-2">
+              <p className="text-sm font-medium text-gray-600">Instagram insights coming soon</p>
+              <p className="text-xs text-gray-400">
+                Follower count is live. Reach and impressions data will be available once
+                our Meta integration is fully approved. No action needed on your end.
               </p>
             </div>
           )}
