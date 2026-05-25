@@ -93,12 +93,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="px-3 pb-2">
-          <Link
-            href="/dashboard"
+          <a
+            href="/dashboard/services"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-white/30 hover:text-white/50 transition-colors"
           >
-            ← Client dashboard
-          </Link>
+            ← Client dashboard ↗
+          </a>
         </div>
 
         <div className="px-5 py-4 border-t border-white/5 flex items-center gap-3">

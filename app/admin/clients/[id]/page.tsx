@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import AdminNotes from './AdminNotes'
 import OrderStatusUpdater from './OrderStatusUpdater'
+import AdminDeliverables from './AdminDeliverables'
+import AdminBrandKit from './AdminBrandKit'
 import {
   ArrowLeft, Globe, Mail, Hash,
   Calendar, CreditCard, ShoppingBag,
@@ -60,6 +62,24 @@ export default async function AdminClientDetailPage({
     .eq('user_id', client.id)
     .order('created_at', { ascending: false })
     .limit(5)
+
+  const { data: deliverables } = await supabase
+    .from('deliverables')
+    .select('*')
+    .eq('user_id', client.id)
+    .order('created_at', { ascending: false })
+
+  const { data: brandDocuments } = await supabase
+    .from('brand_documents')
+    .select('*')
+    .eq('user_id', client.id)
+    .order('type')
+
+  const { data: brandAnswers } = await supabase
+    .from('brand_answers')
+    .select('answers, completed, updated_at')
+    .eq('user_id', client.id)
+    .single()
 
   return (
     <div className="px-8 py-8 max-w-6xl">
@@ -197,6 +217,22 @@ export default async function AdminClientDetailPage({
           />
         </div>
       </div>
+
+      {/* Deliverables */}
+      <div className="mt-4 bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-5">Deliverables</h2>
+        <AdminDeliverables clientId={client.id} initialDeliverables={deliverables ?? []} />
+      </div>
+
+      {/* Brand Kit */}
+      <div className="mt-4 bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-5">Brand Kit</h2>
+        <AdminBrandKit
+          documents={brandDocuments ?? []}
+          answers={brandAnswers ?? null}
+        />
+      </div>
+
     </div>
   )
 }

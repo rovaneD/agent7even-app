@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-react'
 
 const NAV = [
@@ -30,6 +31,7 @@ const NAV = [
     items: [
       { href: '/dashboard/services', label: 'Services', icon: ShoppingBag },
       { href: '/dashboard/ai-toolkit', label: 'AI Toolkit', icon: Zap },
+      { href: '/dashboard/brand-kit', label: 'Brand Kit', icon: Sparkles },
       { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
       { href: '/dashboard/deliverables', label: 'Deliverables', icon: FileText },
     ],

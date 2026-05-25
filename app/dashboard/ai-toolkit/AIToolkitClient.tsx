@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Zap, Mail, Hash, Megaphone, Brush,
   BookOpen, Search, Copy, Check, Loader2,
-  ChevronRight, Clock, Star, Plus, X
+  ChevronRight, Clock, Star, X, Lock,
+  TrendingUp, ArrowRight, Info, Sparkles, CheckCircle,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -32,26 +33,111 @@ interface Profile {
   full_name?: string
 }
 
+// ── Plan config ───────────────────────────────────────────────────────────────
+
+const STARTER_LIMIT = 15
+
+const PLAN_META: Record<string, { label: string; color: string; bg: string }> = {
+  starter:  { label: 'Starter',  color: 'text-gray-700',     bg: 'bg-gray-100' },
+  growth:   { label: 'Growth',   color: 'text-[#c8522a]',    bg: 'bg-[#c8522a]/10' },
+  proagent: { label: 'ProAgent', color: 'text-purple-700',   bg: 'bg-purple-100' },
+}
+
+function getPlanLimits(plan: string | null): { unlimited: boolean; limit: number } {
+  if (plan === 'growth' || plan === 'proagent') return { unlimited: true, limit: Infinity }
+  if (plan === 'starter') return { unlimited: false, limit: STARTER_LIMIT }
+  return { unlimited: false, limit: 0 }
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
-  { id: 'all', label: 'All tools', icon: Zap },
-  { id: 'social', label: 'Social', icon: Hash },
-  { id: 'email', label: 'Email', icon: Mail },
-  { id: 'ads', label: 'Ads', icon: Megaphone },
-  { id: 'seo', label: 'SEO', icon: Search },
-  { id: 'brand', label: 'Brand', icon: Brush },
-  { id: 'operations', label: 'Operations', icon: BookOpen },
+  { id: 'all',        label: 'All tools',   icon: Zap },
+  { id: 'social',     label: 'Social',      icon: Hash },
+  { id: 'email',      label: 'Email',       icon: Mail },
+  { id: 'ads',        label: 'Ads',         icon: Megaphone },
+  { id: 'seo',        label: 'SEO',         icon: Search },
+  { id: 'brand',      label: 'Brand',       icon: Brush },
+  { id: 'operations', label: 'Operations',  icon: BookOpen },
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
-  social: 'bg-pink-50 text-pink-600',
-  email: 'bg-blue-50 text-blue-600',
-  ads: 'bg-orange-50 text-orange-600',
-  seo: 'bg-green-50 text-green-600',
-  brand: 'bg-purple-50 text-purple-600',
+  social:     'bg-pink-50 text-pink-600',
+  email:      'bg-blue-50 text-blue-600',
+  ads:        'bg-orange-50 text-orange-600',
+  seo:        'bg-green-50 text-green-600',
+  brand:      'bg-purple-50 text-purple-600',
   operations: 'bg-gray-50 text-gray-600',
-  general: 'bg-gray-50 text-gray-600',
+  general:    'bg-gray-50 text-gray-600',
+}
+
+// ── Plan tier per category ────────────────────────────────────────────────────
+// Maps each category to the minimum plan required to use it.
+
+const CATEGORY_MIN_PLAN: Record<string, 'starter' | 'growth' | 'proagent'> = {
+  social:     'starter',
+  email:      'starter',
+  ads:        'growth',
+  seo:        'growth',
+  operations: 'growth',
+  brand:      'proagent',
+  general:    'starter',
+}
+
+const PLAN_ORDER = ['starter', 'growth', 'proagent']
+
+function meetsRequirement(userPlan: string | null, required: string): boolean {
+  if (!userPlan) return false
+  return PLAN_ORDER.indexOf(userPlan) >= PLAN_ORDER.indexOf(required)
+}
+
+const PLAN_BADGE: Record<string, { label: string; style: string }> = {
+  starter:  { label: 'Starter+',  style: 'bg-gray-100 text-gray-600' },
+  growth:   { label: 'Growth+',   style: 'bg-[#c8522a]/10 text-[#c8522a]' },
+  proagent: { label: 'ProAgent',  style: 'bg-purple-100 text-purple-700' },
+}
+
+const CATEGORY_TOOLTIP: Record<string, string> = {
+  social:     'Create social media posts, captions, and campaign ideas. Available on all paid plans.',
+  email:      'Write email campaigns, newsletters, and follow-up sequences. Available on all paid plans.',
+  ads:        'Generate ad copy for Google, Meta, and more. Requires Growth or ProAgent.',
+  seo:        'Build keyword strategies, meta descriptions, and blog outlines. Requires Growth or ProAgent.',
+  operations: 'Streamline workflows, SOPs, and business templates. Requires Growth or ProAgent.',
+  brand:      'Develop brand voice, positioning, and strategy documents. ProAgent exclusive.',
+  general:    'General-purpose AI tools. Available on all paid plans.',
+}
+
+const PLAN_TOOLTIP: Record<string, string> = {
+  starter:  'Starter — $49/mo\n15 AI runs/month · Social & Email tools · Full dashboard',
+  growth:   'Growth — $89/mo\nUnlimited runs · All tools including Ads, SEO & Ops · Priority support',
+  proagent: 'ProAgent — $149/mo\nUnlimited runs · Every tool including Brand Strategy · Dedicated support',
+}
+
+// ── Tooltip component ─────────────────────────────────────────────────────────
+
+function Tooltip({ content, children }: { content: string; children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setVisible(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative inline-flex items-center" onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)}>
+      {children}
+      {visible && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-60 bg-gray-900 text-white text-xs rounded-xl px-3.5 py-2.5 shadow-xl whitespace-pre-line leading-relaxed pointer-events-none">
+          {content}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900" />
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -80,10 +166,12 @@ function CopyButton({ text }: { text: string }) {
 function PromptRunner({
   prompt,
   profileId,
+  brandKitComplete,
   onClose,
 }: {
   prompt: Prompt
   profileId: string
+  brandKitComplete: boolean
   onClose: () => void
 }) {
   const [vars, setVars] = useState<Record<string, string>>({})
@@ -91,6 +179,7 @@ function PromptRunner({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [useBrandVoice, setUseBrandVoice] = useState(brandKitComplete)
 
   const filledPrompt = fillPrompt(prompt.prompt, vars)
   const allVarsFilled = prompt.variables.every(v => vars[v.key]?.trim())
@@ -106,6 +195,7 @@ function PromptRunner({
           prompt: filledPrompt,
           promptId: prompt.id,
           timeSavedMins: prompt.time_saved_mins,
+          useBrandVoice,
         }),
       })
       const data = await res.json()
@@ -133,12 +223,13 @@ function PromptRunner({
     }
   }
 
+  void profileId
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
 
-        {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
           <div>
             <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full ${CATEGORY_COLORS[prompt.category] ?? 'bg-gray-50 text-gray-500'}`}>
@@ -155,8 +246,6 @@ function PromptRunner({
         </div>
 
         <div className="p-6 space-y-5">
-
-          {/* Variables */}
           {prompt.variables.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Fill in your details</p>
@@ -177,7 +266,26 @@ function PromptRunner({
             </div>
           )}
 
-          {/* Run button */}
+          {/* Brand voice toggle */}
+          <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${useBrandVoice && brandKitComplete ? 'bg-[#c8522a]/5 border-[#c8522a]/20' : 'bg-gray-50 border-gray-100'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${useBrandVoice && brandKitComplete ? 'bg-[#c8522a]/10' : 'bg-gray-100'}`}>
+                <Sparkles size={15} className={useBrandVoice && brandKitComplete ? 'text-[#c8522a]' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Use my brand voice</p>
+                <p className="text-xs text-gray-400">{brandKitComplete ? "Claude will write in your brand's tone and style" : 'Complete your Brand Kit to enable this feature'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => brandKitComplete && setUseBrandVoice(v => !v)}
+              disabled={!brandKitComplete}
+              className={`relative w-11 h-6 rounded-full transition-colors ${useBrandVoice && brandKitComplete ? 'bg-[#c8522a]' : brandKitComplete ? 'bg-gray-200' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${useBrandVoice && brandKitComplete ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
           <button
             onClick={run}
             disabled={loading || (!allVarsFilled && prompt.variables.length > 0)}
@@ -186,7 +294,6 @@ function PromptRunner({
             {loading ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Zap size={14} /> Generate</>}
           </button>
 
-          {/* Output */}
           {output && (
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -205,8 +312,6 @@ function PromptRunner({
               <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap border border-gray-100">
                 {output}
               </div>
-
-              {/* Regenerate */}
               <button
                 onClick={run}
                 disabled={loading}
@@ -222,41 +327,182 @@ function PromptRunner({
   )
 }
 
+// ── Plan banner ───────────────────────────────────────────────────────────────
+
+function PlanBanner({ plan, monthlyRuns }: { plan: string | null; monthlyRuns: number }) {
+  const { unlimited, limit } = getPlanLimits(plan)
+  const meta = plan ? PLAN_META[plan] : null
+  const runsLeft = Math.max(0, limit - monthlyRuns)
+  const pct = unlimited ? 100 : Math.min(100, (monthlyRuns / limit) * 100)
+  const nearLimit = !unlimited && monthlyRuns >= limit * 0.8
+
+  if (!plan) {
+    return (
+      <div className="bg-[#0d0d0d] rounded-2xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+            <Lock size={16} className="text-white/60" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">No active plan</p>
+            <p className="text-xs text-white/40 mt-0.5">Subscribe to start using AI tools</p>
+          </div>
+        </div>
+        <a
+          href="/pricing"
+          className="inline-flex items-center gap-2 bg-[#c8522a] hover:bg-[#b8471f] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+        >
+          View plans <ArrowRight size={14} />
+        </a>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-2xl border p-5 mb-6 ${nearLimit ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Tooltip content={PLAN_TOOLTIP[plan] ?? plan}>
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-full cursor-default flex items-center gap-1.5 ${meta?.bg} ${meta?.color}`}>
+              {meta?.label ?? plan}
+              <Info size={11} className="opacity-60" />
+            </span>
+          </Tooltip>
+          {unlimited ? (
+            <p className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">Unlimited</span> AI runs this month
+            </p>
+          ) : (
+            <p className="text-sm text-gray-600">
+              <span className={`font-semibold ${nearLimit ? 'text-amber-700' : 'text-gray-900'}`}>
+                {monthlyRuns} of {limit}
+              </span>{' '}
+              runs used this month
+              {runsLeft > 0 && (
+                <span className="text-gray-400 ml-1">({runsLeft} left)</span>
+              )}
+            </p>
+          )}
+        </div>
+
+        {plan === 'starter' && (
+          <a
+            href="/dashboard/billing"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#c8522a] hover:text-[#b8471f] transition-colors flex-shrink-0"
+          >
+            <TrendingUp size={14} />
+            Upgrade to Growth — unlimited runs
+          </a>
+        )}
+      </div>
+
+      {!unlimited && (
+        <div className="mt-4">
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                pct >= 100 ? 'bg-red-400' : pct >= 80 ? 'bg-amber-400' : 'bg-[#c8522a]'
+              }`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {pct >= 100 && (
+            <p className="text-xs text-red-600 font-medium mt-2">
+              Monthly limit reached. <a href="/dashboard/billing" className="underline">Upgrade to Growth</a> for unlimited runs.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Upgrade callout (shown below the grid when on starter) ────────────────────
+
+function UpgradeCallout() {
+  return (
+    <div className="mt-8 rounded-2xl bg-gradient-to-br from-[#c8522a] to-[#a03d1c] p-6 text-white">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-1">Growth &amp; ProAgent</p>
+          <h3 className="text-base font-semibold mb-1">Unlock unlimited AI runs</h3>
+          <p className="text-sm text-white/70">
+            Starter is limited to 15 runs/month. Upgrade to Growth ($89/mo) for unlimited access to every AI tool.
+          </p>
+        </div>
+        <a
+          href="/pricing"
+          className="inline-flex items-center gap-2 bg-white text-[#c8522a] text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#f5f4f0] transition-colors flex-shrink-0 whitespace-nowrap"
+        >
+          See plans <ArrowRight size={14} />
+        </a>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AIToolkitClient({
-  profile,
   prompts,
   savedPrompts,
-  totalOutputs,
+  totalRuns,
   totalTimeSaved,
+  plan,
+  monthlyRuns,
+  hasBrandKit: _hasBrandKit,
+  brandKitComplete,
 }: {
-  profile: Profile | null
   prompts: Prompt[]
   savedPrompts: SavedPrompt[]
-  totalOutputs: number
+  totalRuns: number
   totalTimeSaved: number
+  plan: string | null
+  monthlyRuns: number
+  companyName: string
+  hasBrandKit: boolean
+  brandKitComplete: boolean
 }) {
   const [activeCategory, setActiveCategory] = useState('all')
+  const [activeTier, setActiveTier] = useState<'all' | 'starter' | 'growth' | 'proagent'>('all')
   const [activeTab, setActiveTab] = useState<'library' | 'saved'>('library')
   const [search, setSearch] = useState('')
   const [runningPrompt, setRunningPrompt] = useState<Prompt | null>(null)
 
+  const { unlimited, limit } = getPlanLimits(plan)
+  const isAtLimit = !unlimited && monthlyRuns >= limit
+
+  // Tier filter: cumulative — each tier shows everything included at that level and below
+  // Starter → starter tools only | Growth → starter + growth | ProAgent → all tools
   const filtered = prompts.filter(p => {
+    const requiredTier = CATEGORY_MIN_PLAN[p.category] ?? 'starter'
+    const matchesTier = activeTier === 'all' || meetsRequirement(activeTier, requiredTier)
     const matchesCategory = activeCategory === 'all' || p.category === activeCategory
     const matchesSearch = search === '' ||
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.description?.toLowerCase().includes(search.toLowerCase())
-    return matchesCategory && matchesSearch
+    return matchesTier && matchesCategory && matchesSearch
   })
 
   const totalHours = Math.round(totalTimeSaved / 60 * 10) / 10
+
+  function isPromptLocked(prompt: Prompt): boolean {
+    const required = CATEGORY_MIN_PLAN[prompt.category] ?? 'starter'
+    if (!meetsRequirement(plan, required)) return true
+    if (isAtLimit) return true
+    return false
+  }
+
+  function handlePromptClick(prompt: Prompt) {
+    if (isPromptLocked(prompt)) return
+    setRunningPrompt(prompt)
+  }
 
   return (
     <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-5xl">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div>
           <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">AI Toolkit</p>
           <h1 className="text-2xl font-bold text-gray-900">Your AI tools</h1>
@@ -264,7 +510,7 @@ export default function AIToolkitClient({
         </div>
         <div className="flex gap-3 sm:flex-shrink-0">
           <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 text-center flex-1 sm:flex-initial sm:px-5">
-            <p className="text-xl font-bold text-[#c8522a]">{totalOutputs}</p>
+            <p className="text-xl font-bold text-[#c8522a]">{totalRuns}</p>
             <p className="text-xs text-gray-400">Outputs</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 text-center flex-1 sm:flex-initial sm:px-5">
@@ -273,6 +519,27 @@ export default function AIToolkitClient({
           </div>
         </div>
       </div>
+
+      {/* Brand Kit nudge / active banner */}
+      {!brandKitComplete && (
+        <div className="flex items-start gap-3 bg-[#c8522a]/5 border border-[#c8522a]/10 rounded-xl px-4 py-3 mb-5">
+          <Sparkles size={15} className="text-[#c8522a] mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 mb-0.5">Your AI outputs are generic right now</p>
+            <p className="text-xs text-gray-500 leading-relaxed">Complete your Brand Kit and Claude will automatically write in your brand&apos;s voice, tone, and style — for every prompt you run.</p>
+          </div>
+          <a href="/dashboard/brand-kit" className="flex-shrink-0 text-xs font-semibold text-[#c8522a] bg-[#c8522a]/10 hover:bg-[#c8522a]/20 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">Complete Brand Kit →</a>
+        </div>
+      )}
+      {brandKitComplete && (
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 mb-5">
+          <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
+          <p className="text-xs text-emerald-700 font-medium">Brand Kit active — AI outputs will reflect your brand voice when enabled</p>
+        </div>
+      )}
+
+      {/* Plan banner */}
+      <PlanBanner plan={plan} monthlyRuns={monthlyRuns} />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-6">
@@ -291,6 +558,37 @@ export default function AIToolkitClient({
 
       {activeTab === 'library' && (
         <>
+          {/* Plan tier toggle */}
+          <div className="flex items-center gap-2 mb-5 flex-wrap">
+            {([
+              { key: 'all',      label: 'Show all' },
+              { key: 'starter',  label: 'Starter',  badge: 'bg-gray-100 text-gray-600' },
+              { key: 'growth',   label: 'Growth',   badge: 'bg-[#c8522a]/10 text-[#c8522a]' },
+              { key: 'proagent', label: 'ProAgent', badge: 'bg-purple-100 text-purple-700' },
+            ] as const).map(tier => (
+              <button
+                key={tier.key}
+                onClick={() => { setActiveTier(tier.key); setActiveCategory('all') }}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                  activeTier === tier.key
+                    ? tier.key === 'all'
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : `${tier.badge} border-current`
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {tier.key !== 'all' && activeTier !== tier.key ? `${tier.label} plan` : tier.label}
+              </button>
+            ))}
+            {activeTier !== 'all' && (
+              <span className="text-xs text-gray-400 ml-1">
+                {activeTier === 'starter'  && 'Social & Email tools included in every plan'}
+                {activeTier === 'growth'   && 'All Starter tools + Ads, SEO & Operations'}
+                {activeTier === 'proagent' && 'Every tool — Starter, Growth & Brand Strategy'}
+              </span>
+            )}
+          </div>
+
           {/* Search + category filter */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
             <div className="relative w-full sm:flex-1 sm:max-w-xs">
@@ -309,7 +607,7 @@ export default function AIToolkitClient({
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
+                    onClick={() => { setActiveCategory(cat.id); setActiveTier('all') }}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                       activeCategory === cat.id
                         ? 'bg-[#c8522a] text-white'
@@ -326,30 +624,88 @@ export default function AIToolkitClient({
 
           {/* Prompt cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {filtered.map(prompt => (
-              <button
-                key={prompt.id}
-                onClick={() => setRunningPrompt(prompt)}
-                className="bg-white rounded-2xl border border-gray-100 p-5 text-left hover:border-gray-200 hover:shadow-sm transition-all group"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full ${CATEGORY_COLORS[prompt.category] ?? 'bg-gray-50 text-gray-500'}`}>
-                    {prompt.category}
-                  </span>
-                  <div className="flex items-center gap-1 text-[10px] text-gray-300">
-                    <Clock size={10} />
-                    ~{prompt.time_saved_mins}m saved
+            {filtered.map(prompt => {
+              const locked = isPromptLocked(prompt)
+              const required = CATEGORY_MIN_PLAN[prompt.category] ?? 'starter'
+              const planBadge = PLAN_BADGE[required]
+              const tierTooltip = CATEGORY_TOOLTIP[prompt.category] ?? ''
+              const needsUpgrade = plan ? !meetsRequirement(plan, required) : false
+
+              return (
+                <button
+                  key={prompt.id}
+                  onClick={() => handlePromptClick(prompt)}
+                  disabled={locked}
+                  className={`rounded-2xl border p-5 text-left transition-all group relative ${
+                    locked
+                      ? 'bg-gray-50 border-gray-200 cursor-not-allowed'
+                      : 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm cursor-pointer'
+                  }`}
+                >
+                  {locked && (
+                    <div className="absolute top-3.5 right-3.5 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                      <Lock size={11} className="text-gray-500" />
+                    </div>
+                  )}
+
+                  <div className="flex items-start justify-between mb-3">
+                    <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full ${CATEGORY_COLORS[prompt.category] ?? 'bg-gray-50 text-gray-500'}`}>
+                      {prompt.category}
+                    </span>
+                    <div className={`flex items-center gap-1 text-[10px] text-gray-400 ${locked ? 'pr-7' : ''}`}>
+                      <Clock size={10} />
+                      ~{prompt.time_saved_mins}m saved
+                    </div>
                   </div>
-                </div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-1 group-hover:text-[#c8522a] transition-colors">
-                  {prompt.title}
-                </h3>
-                <p className="text-xs text-gray-400 leading-relaxed mb-4">{prompt.description}</p>
-                <div className="flex items-center gap-1 text-xs font-medium text-[#c8522a]">
-                  Use prompt <ChevronRight size={11} />
-                </div>
-              </button>
-            ))}
+
+                  <h3 className={`text-sm font-semibold mb-1 transition-colors ${locked ? 'text-gray-600' : 'text-gray-900 group-hover:text-[#c8522a]'}`}>
+                    {prompt.title}
+                  </h3>
+                  <p className="text-xs leading-relaxed mb-4 text-gray-500">
+                    {prompt.description}
+                  </p>
+
+                  {/* Footer row — plan badge + action */}
+                  <div className="flex items-center justify-between">
+                    <Tooltip content={tierTooltip}>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full cursor-default ${planBadge.style}`}>
+                        {planBadge.label}
+                        <Info size={9} className="opacity-60" />
+                      </span>
+                    </Tooltip>
+
+                    {!locked && (
+                      <div className="flex items-center gap-1 text-xs font-medium text-[#c8522a]">
+                        Use prompt <ChevronRight size={11} />
+                      </div>
+                    )}
+                    {locked && isAtLimit && (
+                      <div className="flex items-center gap-1 text-xs font-medium text-amber-600">
+                        Limit reached
+                      </div>
+                    )}
+                    {locked && needsUpgrade && (
+                      <a
+                        href="/pricing"
+                        onClick={e => e.stopPropagation()}
+                        className="text-xs font-semibold text-[#c8522a] hover:underline"
+                      >
+                        Upgrade →
+                      </a>
+                    )}
+                    {locked && !plan && (
+                      <a
+                        href="/pricing"
+                        onClick={e => e.stopPropagation()}
+                        className="text-xs font-semibold text-[#c8522a] hover:underline"
+                      >
+                        Subscribe →
+                      </a>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
 
             {filtered.length === 0 && (
               <div className="col-span-2 bg-white rounded-2xl border border-gray-100 p-12 text-center">
@@ -358,6 +714,9 @@ export default function AIToolkitClient({
               </div>
             )}
           </div>
+
+          {/* Upgrade callout for starter */}
+          {plan === 'starter' && <UpgradeCallout />}
         </>
       )}
 
@@ -400,7 +759,8 @@ export default function AIToolkitClient({
       {runningPrompt && (
         <PromptRunner
           prompt={runningPrompt}
-          profileId={profile?.id ?? ''}
+          profileId=""
+          brandKitComplete={brandKitComplete}
           onClose={() => setRunningPrompt(null)}
         />
       )}

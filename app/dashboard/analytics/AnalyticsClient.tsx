@@ -9,22 +9,51 @@ import {
 import {
   Globe, Hash, Info, Eye, MousePointerClick,
   Lock, Calendar, ArrowUpRight, ArrowDownRight,
-  X, CheckCircle, Clock, Wifi, RefreshCw,
+  X, CheckCircle, Clock, Wifi, RefreshCw, AlertCircle, DollarSign, Users, ExternalLink,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Range = '7d' | '30d' | '90d'
-type Platform = 'google_analytics' | 'instagram' | 'meta'
 
 interface Props {
   companyName: string
   plan: string
   gaMeasurementId: string | null
-  instagramHandle: string | null
-  metaAdAccountId: string | null
   gaOAuthConnected: boolean
   gaOAuthEmail: string | null
+  metaConnected: boolean
+  igHandle: string | null
+  metaAdAccountId: string | null
+}
+
+interface MetaData {
+  instagram?: {
+    handle: string
+    followers: number
+    media_count: number
+    insights: Array<{
+      name: string
+      values: Array<{ value: number; end_time: string }>
+    }>
+  }
+  ads?: {
+    daily: Array<{
+      date: string
+      spend: number
+      clicks: number
+      impressions: number
+      reach: number
+      conversions: number
+    }>
+    totals: {
+      spend: number
+      clicks: number
+      impressions: number
+      reach: number
+      conversions: number
+    }
+  }
 }
 
 // ── Dummy chart data ──────────────────────────────────────────────────────────
@@ -39,31 +68,16 @@ const websiteData7d = [
   { day: 'Sun', sessions: 87, users: 71 },
 ]
 
-const socialData7d = [
-  { day: 'Mon', reach: 1240, impressions: 1820 },
-  { day: 'Tue', reach: 1580, impressions: 2340 },
-  { day: 'Wed', reach: 980, impressions: 1450 },
-  { day: 'Thu', reach: 2100, impressions: 3120 },
-  { day: 'Fri', reach: 1760, impressions: 2680 },
-  { day: 'Sat', reach: 2340, impressions: 3510 },
-  { day: 'Sun', reach: 1920, impressions: 2840 },
-]
-
-const adsData7d = [
-  { day: 'Mon', spend: 48, clicks: 312, conversions: 14 },
-  { day: 'Tue', spend: 52, clicks: 378, conversions: 18 },
-  { day: 'Wed', spend: 61, clicks: 421, conversions: 22 },
-  { day: 'Thu', spend: 44, clicks: 289, conversions: 11 },
-  { day: 'Fri', spend: 58, clicks: 402, conversions: 19 },
-  { day: 'Sat', spend: 31, clicks: 198, conversions: 8 },
-  { day: 'Sun', spend: 27, clicks: 171, conversions: 6 },
-]
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return `${n}`
+}
+
+function fmtDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function BrandIcon({ src, alt }: { src: string; alt: string }) {
@@ -75,9 +89,15 @@ function BrandIcon({ src, alt }: { src: string; alt: string }) {
 }
 
 function StatCard({
-  label, value, delta, icon: Icon, logoSrc, locked,
+  label, value, delta, icon: Icon, logoSrc, locked, prefix = '',
 }: {
-  label: string; value: string; delta?: number; icon: React.ElementType; logoSrc?: string; locked?: boolean
+  label: string
+  value: string
+  delta?: number
+  icon: React.ElementType
+  logoSrc?: string
+  locked?: boolean
+  prefix?: string
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-3">
@@ -98,7 +118,7 @@ function StatCard({
         </div>
       ) : (
         <div className="flex items-end justify-between">
-          <span className="text-2xl font-semibold text-gray-900">{value}</span>
+          <span className="text-2xl font-semibold text-gray-900">{prefix}{value}</span>
           {delta !== undefined && (
             <span className={`flex items-center gap-0.5 text-xs font-medium ${delta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
               {delta >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
@@ -135,7 +155,23 @@ function InfoTooltip({ text }: { text: string }) {
   )
 }
 
-// ── GA Connect Modal (two-path) ───────────────────────────────────────────────
+function ConnectedBadge({ label, onDisconnect }: { label: string; onDisconnect?: () => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+        <CheckCircle size={11} />
+        {label}
+      </span>
+      {onDisconnect && (
+        <button onClick={onDisconnect} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+          Disconnect
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── GA Connect Modal ──────────────────────────────────────────────────────────
 
 function GAConnectModal({
   onClose,
@@ -190,11 +226,9 @@ function GAConnectModal({
 
         {!showAgencyForm ? (
           <>
-            {/* OAuth path */}
             <p className="text-sm text-gray-500 mb-5 leading-relaxed">
               Sign in with Google to automatically connect your GA4 property and see live data.
             </p>
-
             <a
               href="/api/analytics/ga-connect"
               className="flex items-center justify-center gap-3 w-full py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-sm transition-all text-sm font-semibold text-gray-700 mb-4"
@@ -207,7 +241,6 @@ function GAConnectModal({
               </svg>
               Continue with Google
             </a>
-
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-100" />
@@ -216,7 +249,6 @@ function GAConnectModal({
                 <span className="bg-white px-3 text-xs text-gray-400">or</span>
               </div>
             </div>
-
             <button
               onClick={() => setShowAgencyForm(true)}
               className="w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
@@ -226,11 +258,9 @@ function GAConnectModal({
           </>
         ) : (
           <>
-            {/* Agency path */}
             <p className="text-sm text-gray-500 mb-5 leading-relaxed">
               Enter your GA4 Property ID and our team will complete the connection for you.
             </p>
-
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">GA4 Property ID</label>
             <input
               type="text"
@@ -242,9 +272,7 @@ function GAConnectModal({
             <p className="text-xs text-gray-400 mt-2 leading-relaxed">
               Find this in Google Analytics → Admin → Property Settings → Property ID (the numeric ID, not the G-... code).
             </p>
-
             {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
-
             <div className="flex gap-2 mt-5">
               <button
                 onClick={() => setShowAgencyForm(false)}
@@ -267,7 +295,7 @@ function GAConnectModal({
   )
 }
 
-// ── Property Selector Modal (after OAuth) ─────────────────────────────────────
+// ── Property Selector Modal ───────────────────────────────────────────────────
 
 interface GAProperty { id: string; name: string; account?: string }
 
@@ -371,9 +399,7 @@ function PropertySelectorModal({
                   <p className="text-sm font-semibold text-gray-800">{p.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{p.account ? `${p.account} · ` : ''}ID: {p.id}</p>
                 </div>
-                {selected === p.id && (
-                  <CheckCircle size={16} className="text-[#c8522a] flex-shrink-0" />
-                )}
+                {selected === p.id && <CheckCircle size={16} className="text-[#c8522a] flex-shrink-0" />}
               </button>
             ))}
           </div>
@@ -395,148 +421,61 @@ function PropertySelectorModal({
   )
 }
 
-// ── Other platform connect modal ──────────────────────────────────────────────
+// ── Locked section with blurred chart preview ─────────────────────────────────
 
-const OTHER_PLATFORM_CONFIG = {
-  instagram: {
-    label: 'Instagram',
-    fieldLabel: 'Instagram handle',
-    placeholder: '@yourbrand',
-    hint: 'Your Instagram username (with or without @). Must be a Business or Creator account.',
-  },
-  meta: {
-    label: 'Meta Ads',
-    fieldLabel: 'Ad Account ID',
-    placeholder: 'act_XXXXXXXXXX',
-    hint: 'Find this in Meta Business Suite → Ad Accounts. Format is usually act_ followed by digits.',
-  },
-}
-
-function OtherConnectModal({
-  platform,
-  initialValue,
-  onClose,
-  onSuccess,
+function LockedPreviewSection({
+  title, description, logoSrc, icon: Icon, tooltip, connectHref, connectLabel,
 }: {
-  platform: 'instagram' | 'meta'
-  initialValue: string
-  onClose: () => void
-  onSuccess: (value: string) => void
+  title: string
+  description: string
+  logoSrc?: string
+  icon: React.ElementType
+  tooltip: string
+  connectHref: string
+  connectLabel: string
 }) {
-  const cfg = OTHER_PLATFORM_CONFIG[platform]
-  const [value, setValue] = useState(initialValue)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const submit = async () => {
-    if (!value.trim()) { setError('Please enter a value.'); return }
-    setLoading(true)
-    setError('')
-    try {
-      const res = await fetch('/api/analytics/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform, value: value.trim() }),
-      })
-      if (!res.ok) throw new Error('Failed')
-      onSuccess(value.trim())
-    } catch {
-      setError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
-          <X size={14} className="text-gray-500" />
-        </button>
-        <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-1">Connect</p>
-        <h2 className="text-lg font-bold text-gray-900 mb-1">{cfg.label}</h2>
-        <p className="text-sm text-gray-400 mb-5">Enter your {cfg.fieldLabel.toLowerCase()} and we'll set up the connection for you.</p>
-        <label className="block text-xs font-semibold text-gray-700 mb-1.5">{cfg.fieldLabel}</label>
-        <input
-          type="text"
-          value={value}
-          onChange={e => { setValue(e.target.value); setError('') }}
-          placeholder={cfg.placeholder}
-          className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:border-[#c8522a] focus:ring-1 focus:ring-[#c8522a] transition-colors"
-        />
-        <p className="text-xs text-gray-400 mt-2 leading-relaxed">{cfg.hint}</p>
-        {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors">Cancel</button>
-          <button onClick={submit} disabled={loading} className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#c8522a] rounded-xl hover:bg-[#b8471f] disabled:opacity-50 transition-colors">
-            {loading ? 'Saving…' : 'Request connection'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Locked section (Instagram / Meta) ─────────────────────────────────────────
-
-function LockedSection({
-  title, description, tooltip, icon: Icon, logoSrc, connectLabel, platform, pendingValue, onConnect,
-}: {
-  title: string; description: string; tooltip: string; icon: React.ElementType; logoSrc?: string
-  connectLabel: string; platform: Platform; pendingValue: string | null; onConnect: (p: Platform) => void
-}) {
-  const isPending = Boolean(pendingValue)
   return (
     <div className="bg-white rounded-2xl border border-gray-100">
       <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
         <div className="flex items-center gap-3">
           {logoSrc ? <BrandIcon src={logoSrc} alt={title} /> : (
-            <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center"><Icon size={16} className="text-gray-400" /></div>
+            <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center">
+              <Icon size={16} className="text-gray-400" />
+            </div>
           )}
           <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
           <InfoTooltip text={tooltip} />
         </div>
-        {isPending ? (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full"><Clock size={11} />Pending</span>
-        ) : (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full"><Lock size={11} />Not connected</span>
-        )}
+        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
+          <Lock size={11} /> Not connected
+        </span>
       </div>
       <div className="relative px-6 pt-6 pb-2 select-none pointer-events-none" aria-hidden="true">
-        <div className="blur-sm opacity-30">
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={websiteData7d} barSize={14}>
-              <Bar dataKey="sessions" fill="#c8522a" radius={[3, 3, 0, 0]} />
+        <div className="blur-sm opacity-20">
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={[
+              { d: 'M', v: 142 }, { d: 'T', v: 189 }, { d: 'W', v: 201 },
+              { d: 'T', v: 176 }, { d: 'F', v: 224 }, { d: 'S', v: 98 }, { d: 'S', v: 87 },
+            ]} barSize={14}>
+              <Bar dataKey="v" fill="#c8522a" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/60">
-          {isPending ? (
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <CheckCircle size={18} className="text-amber-500" />
-                <p className="text-sm font-semibold text-gray-800">Connection requested</p>
-              </div>
-              <p className="text-xs text-gray-400 mb-1">Your Agent7even team will confirm this shortly.</p>
-              <p className="text-xs text-gray-300">{pendingValue}</p>
-            </div>
-          ) : (
-            <>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-gray-800 mb-1">{description}</p>
-                <p className="text-xs text-gray-400">Connect your account to see live data here.</p>
-              </div>
-              <button
-                onClick={() => onConnect(platform)}
-                className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-[#b8471f] transition-colors pointer-events-auto"
-              >
-                {connectLabel}
-              </button>
-            </>
-          )}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/70">
+          <div className="text-center">
+            <p className="text-sm font-semibold text-gray-800 mb-1">{description}</p>
+            <p className="text-xs text-gray-400">Connect your account to see live data here.</p>
+          </div>
+          <a
+            href={connectHref}
+            className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-[#b8471f] transition-colors pointer-events-auto"
+          >
+            {connectLabel}
+            <ExternalLink size={12} />
+          </a>
         </div>
       </div>
-      <div className="h-16 rounded-b-2xl overflow-hidden" />
+      <div className="h-16" />
     </div>
   )
 }
@@ -553,8 +492,12 @@ interface GaData {
 function WebsiteAnalyticsSection({
   propertyId, oauthConnected, range, tooltip, onConnect, onSessionsLoaded, onDisconnect,
 }: {
-  propertyId: string | null; oauthConnected: boolean; range: Range; tooltip: string
-  onConnect: (p: Platform) => void; onSessionsLoaded: (n: number | null) => void
+  propertyId: string | null
+  oauthConnected: boolean
+  range: Range
+  tooltip: string
+  onConnect: () => void
+  onSessionsLoaded: (n: number | null) => void
   onDisconnect: () => void
 }) {
   const [status, setStatus] = useState<GaStatus>('loading')
@@ -587,7 +530,6 @@ function WebsiteAnalyticsSection({
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Header bar (reused across states)
   const header = (badge: React.ReactNode) => (
     <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
       <div className="flex items-center gap-3">
@@ -624,7 +566,7 @@ function WebsiteAnalyticsSection({
               }
             </div>
             <button
-              onClick={() => onConnect('google_analytics')}
+              onClick={onConnect}
               className="inline-flex items-center gap-2 bg-[#c8522a] text-white text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-[#b8471f] transition-colors pointer-events-auto"
             >
               {oauthConnected ? 'Select property' : 'Connect Google Analytics'}
@@ -705,7 +647,7 @@ function WebsiteAnalyticsSection({
     )
   }
 
-  // Pending — service account needs access
+  // Pending state
   return (
     <div className="bg-white rounded-2xl border border-gray-100">
       {header(
@@ -735,7 +677,7 @@ function WebsiteAnalyticsSection({
             </p>
             <p className="text-xs text-gray-400 mt-3">
               Want to connect instantly?{' '}
-              <button onClick={() => onConnect('google_analytics')} className="font-semibold text-[#c8522a] underline underline-offset-2 pointer-events-auto hover:text-[#b8471f]">
+              <button onClick={onConnect} className="font-semibold text-[#c8522a] underline underline-offset-2 pointer-events-auto hover:text-[#b8471f]">
                 Use Google sign-in instead →
               </button>
             </p>
@@ -757,23 +699,33 @@ function WebsiteAnalyticsSection({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnalyticsClient({
-  companyName, gaMeasurementId, instagramHandle, metaAdAccountId, gaOAuthConnected, gaOAuthEmail,
+  companyName,
+  gaMeasurementId,
+  gaOAuthConnected,
+  gaOAuthEmail,
+  metaConnected: initialMetaConnected,
+  igHandle: initialIgHandle,
+  metaAdAccountId,
 }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
   const [range, setRange] = useState<Range>('7d')
-  const [activePlatform, setActivePlatform] = useState<Platform | null>(null)
+  const [showGAModal, setShowGAModal] = useState(false)
   const [showPropertySelector, setShowPropertySelector] = useState(false)
   const [oauthError, setOauthError] = useState('')
   const [liveSessions, setLiveSessions] = useState<number | null>(null)
 
   const [gaId, setGaId] = useState(gaMeasurementId)
-  const [igHandle, setIgHandle] = useState(instagramHandle)
-  const [metaId, setMetaId] = useState(metaAdAccountId)
   const [oauthConnected, setOauthConnected] = useState(gaOAuthConnected)
 
-  // Handle OAuth redirect query params
+  const [metaConnected, setMetaConnected] = useState(initialMetaConnected)
+  const [igHandle, setIgHandle] = useState(initialIgHandle)
+  const [metaData, setMetaData] = useState<MetaData | null>(null)
+  const [metaLoading, setMetaLoading] = useState(false)
+  const [metaError, setMetaError] = useState<string | null>(null)
+
+  // Handle GA OAuth redirect params
   useEffect(() => {
     const oauthStatus = searchParams.get('ga_oauth')
     const gaError = searchParams.get('ga_error')
@@ -792,72 +744,94 @@ export default function AnalyticsClient({
     }
   }, [searchParams, router])
 
-  const handleGAConnect = (platform: Platform) => {
-    if (platform === 'google_analytics') {
-      // If OAuth is already connected, show property selector; else show GA connect modal
-      if (oauthConnected) {
-        setShowPropertySelector(true)
-      } else {
-        setActivePlatform('google_analytics')
-      }
+  // Handle Meta OAuth redirect params
+  useEffect(() => {
+    if (searchParams.get('meta_connected') === 'true') {
+      setMetaConnected(true)
+      window.history.replaceState({}, '', '/dashboard/analytics')
+    }
+    if (searchParams.get('meta_error')) {
+      setMetaError('Failed to connect Meta. Please try again.')
+      window.history.replaceState({}, '', '/dashboard/analytics')
+    }
+  }, [searchParams])
+
+  const fetchMetaData = useCallback(async () => {
+    if (!metaConnected) return
+    setMetaLoading(true)
+    setMetaError(null)
+    try {
+      const res = await fetch(`/api/analytics/meta-data?range=${range}`)
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
+      setMetaData(data)
+      if (data.instagram?.handle) setIgHandle(data.instagram.handle)
+    } catch {
+      setMetaError('Failed to load Meta data. Please try again.')
+    } finally {
+      setMetaLoading(false)
+    }
+  }, [metaConnected, range])
+
+  useEffect(() => { fetchMetaData() }, [fetchMetaData])
+
+  async function handleMetaDisconnect() {
+    await fetch('/api/analytics/meta-disconnect', { method: 'POST' })
+    setMetaConnected(false)
+    setMetaData(null)
+    setIgHandle(null)
+  }
+
+  const handleGAConnect = () => {
+    if (oauthConnected) {
+      setShowPropertySelector(true)
     } else {
-      setActivePlatform(platform)
+      setShowGAModal(true)
     }
   }
 
-  const handlePropertySelected = (propertyId: string) => {
-    setGaId(propertyId)
-    setShowPropertySelector(false)
-  }
-
-  const handleDisconnect = () => {
-    setGaId(null)
-    setOauthConnected(false)
-    setLiveSessions(null)
-  }
+  const adTotals = metaData?.ads?.totals
+  const igChartData = metaData?.instagram?.insights
+    ?.find(m => m.name === 'reach')
+    ?.values.map(v => ({ day: fmtDate(v.end_time), reach: v.value })) ?? []
+  const adsChartData = metaData?.ads?.daily.map(d => ({
+    day: fmtDate(d.date),
+    spend: d.spend,
+    clicks: d.clicks,
+  })) ?? []
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
 
       {/* Modals */}
-      {activePlatform === 'google_analytics' && (
+      {showGAModal && (
         <GAConnectModal
           currentPropertyId={gaId ?? ''}
-          onClose={() => setActivePlatform(null)}
-          onAgencySuccess={(value) => { setGaId(value); setActivePlatform(null) }}
-        />
-      )}
-      {activePlatform === 'instagram' && (
-        <OtherConnectModal
-          platform="instagram"
-          initialValue={igHandle ?? ''}
-          onClose={() => setActivePlatform(null)}
-          onSuccess={(value) => { setIgHandle(value); setActivePlatform(null) }}
-        />
-      )}
-      {activePlatform === 'meta' && (
-        <OtherConnectModal
-          platform="meta"
-          initialValue={metaId ?? ''}
-          onClose={() => setActivePlatform(null)}
-          onSuccess={(value) => { setMetaId(value); setActivePlatform(null) }}
+          onClose={() => setShowGAModal(false)}
+          onAgencySuccess={(value) => { setGaId(value); setShowGAModal(false) }}
         />
       )}
       {showPropertySelector && (
         <PropertySelectorModal
           oauthEmail={gaOAuthEmail}
           onClose={() => setShowPropertySelector(false)}
-          onSelect={handlePropertySelected}
+          onSelect={(propertyId) => { setGaId(propertyId); setShowPropertySelector(false) }}
         />
       )}
 
-      {/* OAuth error toast */}
+      {/* Error toasts */}
       {oauthError && (
         <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
           <p className="text-xs text-red-600 font-medium">{oauthError}</p>
           <button onClick={() => setOauthError('')} className="text-red-400 hover:text-red-600">
             <X size={14} />
           </button>
+        </div>
+      )}
+      {metaError && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+          <AlertCircle size={15} className="text-red-500 flex-shrink-0" />
+          <p className="text-sm text-red-700">{metaError}</p>
         </div>
       )}
 
@@ -886,26 +860,50 @@ export default function AnalyticsClient({
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Website sessions" value={liveSessions !== null ? fmt(liveSessions) : '—'} icon={Globe} logoSrc="/google_analytics_icon.png" locked={liveSessions === null} />
-        <StatCard label="Instagram followers" value="—" icon={Hash} logoSrc="/instagram-logo.png" locked />
-        <StatCard label="Total reach" value="—" icon={Eye} locked />
-        <StatCard label="Ad clicks" value="—" icon={MousePointerClick} logoSrc="/MetaLogo.png" locked />
+        <StatCard
+          label="Website sessions"
+          value={liveSessions !== null ? fmt(liveSessions) : '—'}
+          icon={Globe}
+          logoSrc="/google_analytics_icon.png"
+          locked={liveSessions === null}
+        />
+        <StatCard
+          label="Instagram followers"
+          value={metaData?.instagram?.followers ? fmt(metaData.instagram.followers) : '—'}
+          icon={Users}
+          logoSrc="/instagram-logo.png"
+          locked={!metaConnected}
+        />
+        <StatCard
+          label="Total reach"
+          value={adTotals?.reach ? fmt(adTotals.reach) : '—'}
+          icon={Eye}
+          locked={!metaConnected}
+        />
+        <StatCard
+          label="Ad spend"
+          value={adTotals?.spend ? adTotals.spend.toFixed(2) : '—'}
+          icon={DollarSign}
+          logoSrc="/MetaLogo.png"
+          locked={!metaConnected}
+          prefix={adTotals?.spend ? '$' : ''}
+        />
       </div>
 
       {/* Notice banner */}
-      {liveSessions === null && (
+      {liveSessions === null && !metaConnected && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
           <Calendar size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-amber-700 leading-relaxed">
-            <span className="font-semibold">Live analytics are coming.</span>{' '}
-            Connect your Google Analytics, Instagram, and Meta Ads accounts below to start seeing real data.
-            Your Agent7even team can also help with setup —{' '}
+            <span className="font-semibold">Connect your accounts to see live data.</span>{' '}
+            Link Google Analytics for website traffic, and Meta for Instagram and ad performance.
+            Your Agent7even team can also help —{' '}
             <a href="/dashboard/support" className="font-semibold underline underline-offset-2 hover:text-amber-900 transition-colors">reach out via Support</a>.
           </p>
         </div>
       )}
 
-      {/* Website Analytics */}
+      {/* Website Analytics (GA) */}
       <WebsiteAnalyticsSection
         propertyId={gaId}
         oauthConnected={oauthConnected}
@@ -913,34 +911,138 @@ export default function AnalyticsClient({
         tooltip="Connect Google Analytics to see live sessions, users, and pageviews. Use 'Connect with Google' for instant setup, or choose the agency-assisted option if you prefer."
         onConnect={handleGAConnect}
         onSessionsLoaded={setLiveSessions}
-        onDisconnect={handleDisconnect}
+        onDisconnect={() => { setGaId(null); setOauthConnected(false); setLiveSessions(null) }}
       />
 
-      {/* Social */}
-      <LockedSection
-        title="Social Media"
-        description="Connect Instagram to track followers, reach, and impressions."
-        tooltip="Your Instagram must be a Business or Creator account. Share access with Agent7even via Meta Business Suite."
-        icon={Hash}
-        logoSrc="/instagram-logo.png"
-        connectLabel="Connect Instagram"
-        platform="instagram"
-        pendingValue={igHandle}
-        onConnect={setActivePlatform}
-      />
+      {/* Instagram */}
+      {!metaConnected ? (
+        <LockedPreviewSection
+          title="Instagram"
+          description="Connect Instagram to track followers, reach, and impressions."
+          icon={Hash}
+          logoSrc="/instagram-logo.png"
+          tooltip="Your Instagram must be a Business account connected to a Facebook Page. The OAuth flow connects via Meta's Marketing API."
+          connectHref="/api/analytics/meta-connect"
+          connectLabel="Connect Instagram & Meta"
+        />
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <BrandIcon src="/instagram-logo.png" alt="Instagram" />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Instagram</h3>
+                {igHandle && <p className="text-xs text-gray-400">@{igHandle}</p>}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {metaLoading && <RefreshCw size={13} className="text-gray-400 animate-spin" />}
+              <ConnectedBadge label="Connected" onDisconnect={handleMetaDisconnect} />
+            </div>
+          </div>
+          {metaLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <p className="text-sm text-gray-400">Loading Instagram data...</p>
+            </div>
+          ) : igChartData.length > 0 ? (
+            <>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 mb-1">Followers</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(metaData?.instagram?.followers ?? 0)}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 mb-1">Posts</p>
+                  <p className="text-xl font-semibold text-gray-900">{metaData?.instagram?.media_count ?? 0}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 mb-1">Period reach</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(igChartData.reduce((a, d) => a + d.reach, 0))}</p>
+                </div>
+              </div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Daily reach</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={igChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
+                  <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), 'Reach']} />
+                  <Line type="monotone" dataKey="reach" stroke="#c8522a" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </>
+          ) : (
+            <div className="h-40 flex items-center justify-center text-center px-8">
+              <p className="text-sm text-gray-400">
+                No Instagram data found. Make sure your Instagram account is a Business account connected to a Facebook Page.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Ads */}
-      <LockedSection
-        title="Paid Ads"
-        description="Connect Meta Ads to track spend, clicks, and conversions."
-        tooltip="Go to Meta Business Suite → Settings → People and add your Agent7even team as a Partner with Advertiser access."
-        icon={MousePointerClick}
-        logoSrc="/MetaLogo.png"
-        connectLabel="Connect Meta Ads"
-        platform="meta"
-        pendingValue={metaId}
-        onConnect={setActivePlatform}
-      />
+      {/* Meta Ads */}
+      {!metaConnected ? (
+        <LockedPreviewSection
+          title="Meta Ads"
+          description="Connect Meta Ads to track spend, clicks, and conversions."
+          icon={MousePointerClick}
+          logoSrc="/MetaLogo.png"
+          tooltip="Go to Meta Business Suite → Settings → People and add your Agent7even team as a Partner with Advertiser access."
+          connectHref="/api/analytics/meta-connect"
+          connectLabel="Connect Instagram & Meta"
+        />
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <BrandIcon src="/MetaLogo.png" alt="Meta" />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Meta Ads</h3>
+                {metaAdAccountId && <p className="text-xs text-gray-400">Account {metaAdAccountId}</p>}
+              </div>
+            </div>
+            {metaLoading && <RefreshCw size={13} className="text-gray-400 animate-spin" />}
+          </div>
+          {metaLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <p className="text-sm text-gray-400">Loading ads data...</p>
+            </div>
+          ) : adsChartData.length > 0 ? (
+            <>
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                {[
+                  { label: 'Total spend', value: `$${adTotals?.spend.toFixed(2) ?? '0'}` },
+                  { label: 'Clicks', value: fmt(adTotals?.clicks ?? 0) },
+                  { label: 'Impressions', value: fmt(adTotals?.impressions ?? 0) },
+                  { label: 'Conversions', value: fmt(adTotals?.conversions ?? 0) },
+                ].map(s => (
+                  <div key={s.label} className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 mb-1">{s.label}</p>
+                    <p className="text-xl font-semibold text-gray-900">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Daily spend & clicks</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={adsChartData} barSize={10}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Bar yAxisId="left" dataKey="spend" fill="#c8522a" radius={[3, 3, 0, 0]} name="Spend ($)" />
+                  <Bar yAxisId="right" dataKey="clicks" fill="#e8a48a" radius={[3, 3, 0, 0]} name="Clicks" />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          ) : (
+            <div className="h-40 flex items-center justify-center">
+              <p className="text-sm text-gray-400">No ad data found. Make sure you have active campaigns in Meta Ads.</p>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   )

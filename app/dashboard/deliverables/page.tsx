@@ -1,9 +1,33 @@
-export default function DeliverablesPage() {
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+import { createServiceClient } from '@/lib/supabase/server'
+import DeliverablesClient from './DeliverablesClient'
+
+export default async function DeliverablesPage() {
+  const { userId } = await auth()
+  if (!userId) redirect('/sign-in')
+
+  const supabase = createServiceClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, company_name, plan')
+    .eq('clerk_user_id', userId)
+    .single()
+
+  if (!profile) redirect('/dashboard')
+
+  const { data: deliverables } = await supabase
+    .from('deliverables')
+    .select('*')
+    .eq('user_id', profile.id)
+    .order('created_at', { ascending: false })
+
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8">
-      <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8522a] mb-2">Deliverables</p>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Deliverables</h1>
-      <p className="text-gray-400 text-sm">This section is coming soon.</p>
-    </div>
+    <DeliverablesClient
+      profileId={profile.id}
+      companyName={profile.company_name ?? ''}
+      deliverables={deliverables ?? []}
+    />
   )
 }

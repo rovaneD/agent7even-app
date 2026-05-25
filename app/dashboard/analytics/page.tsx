@@ -10,7 +10,16 @@ export default async function AnalyticsPage() {
   const supabase = createServiceClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, company_name, plan, ga_measurement_id, instagram_handle, meta_ad_account_id, ga_refresh_token, ga_oauth_email, ga_connected')
+    .select(`
+      company_name,
+      plan,
+      ga_connected,
+      ga_measurement_id,
+      ga_oauth_email,
+      meta_connected,
+      instagram_handle,
+      meta_ad_account_id
+    `)
     .eq('clerk_user_id', userId)
     .single()
 
@@ -19,10 +28,11 @@ export default async function AnalyticsPage() {
       companyName={profile?.company_name ?? ''}
       plan={profile?.plan ?? ''}
       gaMeasurementId={profile?.ga_measurement_id ?? null}
-      instagramHandle={profile?.instagram_handle ?? null}
-      metaAdAccountId={profile?.meta_ad_account_id ?? null}
-      gaOAuthConnected={Boolean(profile?.ga_refresh_token)}
+      gaOAuthConnected={profile?.ga_connected ?? false}
       gaOAuthEmail={profile?.ga_oauth_email ?? null}
+      metaConnected={profile?.meta_connected ?? false}
+      igHandle={profile?.instagram_handle ?? null}
+      metaAdAccountId={profile?.meta_ad_account_id ?? null}
     />
   )
 }

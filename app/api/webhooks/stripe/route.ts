@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -6,121 +6,142 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-04-22.dahlia',
 })
 
-export async function POST(req: NextRequest) {
+function getPlanFromPriceId(priceId: string): string | null {
+  const map: Record<string, string> = {
+    [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID!]: 'starter',
+    [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID!]: 'starter',
+    [process.env.STRIPE_GROWTH_MONTHLY_PRICE_ID!]: 'growth',
+    [process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID!]: 'growth',
+    [process.env.STRIPE_PROAGENT_MONTHLY_PRICE_ID!]: 'proagent',
+    [process.env.STRIPE_PROAGENT_ANNUAL_PRICE_ID!]: 'proagent',
+  }
+  return map[priceId] ?? null
+}
+
+export async function POST(req: Request) {
   const body = await req.text()
-  const sig = req.headers.get('stripe-signature')!
+  const sig = req.headers.get('stripe-signature')
+
+  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
+  }
 
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
+    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
-    console.error('Webhook signature verification failed:', err)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    console.error('Stripe webhook verification failed:', err)
+    return NextResponse.json({ error: 'Webhook verification failed' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
 
-  try {
-    switch (event.type) {
+  // ── checkout.session.completed ──────────────────────────────────────────────
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session
 
-      // ── Payment completed (one-time or subscription start) ─────────────
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        const clerkUserId = session.metadata?.clerk_user_id
-        const plan = session.metadata?.plan
+    if (session.mode !== 'subscription') return NextResponse.json({ received: true })
 
-        if (!clerkUserId || !plan) break
+    const subscriptionId = session.subscription as string
+    const customerId = session.customer as string
 
-        await supabase
-          .from('profiles')
-          .update({
-            plan,
-            status: 'active',
-            stripe_customer_id: session.customer as string,
-            stripe_subscription_id: session.subscription as string ?? null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('clerk_user_id', clerkUserId)
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    const priceId = subscription.items.data[0]?.price.id
+    const plan = getPlanFromPriceId(priceId)
 
-        console.log(`✅ Plan activated: ${plan} for ${clerkUserId}`)
-        break
-      }
+    // clerk_user_id lives on subscription metadata (set via subscription_data.metadata at checkout)
+    const clerkUserId =
+      subscription.metadata?.clerk_user_id ??
+      session.metadata?.clerk_user_id
 
-      // ── Subscription updated (upgrade/downgrade) ────────────────────────
-      case 'customer.subscription.updated': {
-        const sub = event.data.object as Stripe.Subscription
-        const customerId = sub.customer as string
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('clerk_user_id')
-          .eq('stripe_customer_id', customerId)
-          .single()
-
-        if (!profile) break
-
-        const status = sub.status === 'active' ? 'active' : 'paused'
-
-        await supabase
-          .from('profiles')
-          .update({
-            status,
-            stripe_subscription_id: sub.id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_customer_id', customerId)
-
-        console.log(`🔄 Subscription updated: ${sub.id}`)
-        break
-      }
-
-      // ── Subscription cancelled ──────────────────────────────────────────
-      case 'customer.subscription.deleted': {
-        const sub = event.data.object as Stripe.Subscription
-        const customerId = sub.customer as string
-
-        await supabase
-          .from('profiles')
-          .update({
-            plan: null,
-            status: 'churned',
-            stripe_subscription_id: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_customer_id', customerId)
-
-        console.log(`❌ Subscription cancelled: ${sub.id}`)
-        break
-      }
-
-      // ── Payment failed ──────────────────────────────────────────────────
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice
-        const customerId = invoice.customer as string
-
-        await supabase
-          .from('profiles')
-          .update({
-            status: 'paused',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_customer_id', customerId)
-
-        console.log(`⚠️ Payment failed for customer: ${customerId}`)
-        break
-      }
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`)
+    if (!clerkUserId || !plan) {
+      console.error('Missing clerk_user_id or plan in checkout session', { clerkUserId, plan })
+      return NextResponse.json({ received: true })
     }
-  } catch (err) {
-    console.error('Webhook handler error:', err)
-    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        plan,
+        status: 'active',
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('clerk_user_id', clerkUserId)
+
+    if (error) console.error('Supabase update error (checkout.session.completed):', error)
+  }
+
+  // ── customer.subscription.updated ──────────────────────────────────────────
+  if (event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object as Stripe.Subscription
+
+    const clerkUserId = subscription.metadata?.clerk_user_id
+    const priceId = subscription.items.data[0]?.price.id
+    const plan = getPlanFromPriceId(priceId)
+
+    if (!clerkUserId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('clerk_user_id')
+        .eq('stripe_subscription_id', subscription.id)
+        .single()
+
+      if (profile?.clerk_user_id && plan) {
+        await supabase
+          .from('profiles')
+          .update({ plan, status: 'active', updated_at: new Date().toISOString() })
+          .eq('clerk_user_id', profile.clerk_user_id)
+      }
+      return NextResponse.json({ received: true })
+    }
+
+    if (plan) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ plan, status: 'active', updated_at: new Date().toISOString() })
+        .eq('clerk_user_id', clerkUserId)
+
+      if (error) console.error('Supabase update error (subscription.updated):', error)
+    }
+  }
+
+  // ── customer.subscription.deleted ──────────────────────────────────────────
+  if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object as Stripe.Subscription
+    const clerkUserId = subscription.metadata?.clerk_user_id
+
+    if (clerkUserId) {
+      await supabase
+        .from('profiles')
+        .update({ plan: null, status: 'churned', stripe_subscription_id: null, updated_at: new Date().toISOString() })
+        .eq('clerk_user_id', clerkUserId)
+    } else {
+      await supabase
+        .from('profiles')
+        .update({ plan: null, status: 'churned', stripe_subscription_id: null, updated_at: new Date().toISOString() })
+        .eq('stripe_subscription_id', subscription.id)
+    }
+  }
+
+  // ── invoice.payment_failed ──────────────────────────────────────────────────
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice
+    // In API 2026-04-22.dahlia, subscription moved to invoice.parent.subscription_details.subscription
+    const parent = invoice.parent as { type?: string; subscription_details?: { subscription?: string } } | null
+    const subscriptionId =
+      parent?.type === 'subscription_details'
+        ? (parent.subscription_details?.subscription as string | undefined)
+        : undefined
+
+    if (subscriptionId) {
+      await supabase
+        .from('profiles')
+        .update({ status: 'paused', updated_at: new Date().toISOString() })
+        .eq('stripe_subscription_id', subscriptionId)
+    }
   }
 
   return NextResponse.json({ received: true })

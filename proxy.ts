@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   '/terms',
   '/api/webhooks(.*)',
   '/api/analytics/ga-callback(.*)',
+  '/api/analytics/meta-callback(.*)',
 ])
 
 export default clerkMiddleware(async (auth, req) => {

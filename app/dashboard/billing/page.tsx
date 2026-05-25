@@ -16,9 +16,11 @@ export default async function BillingPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('plan, status, stripe_customer_id, stripe_subscription_id')
     .eq('clerk_user_id', userId)
     .single()
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.agent7even.com'
 
   let invoices: {
     id: string
@@ -26,60 +28,31 @@ export default async function BillingPage() {
     amount_paid: number
     status: string | null
     created: number
-    invoice_pdf: string | null
     hosted_invoice_url: string | null
   }[] = []
-  let subscription: {
-    status: string
-    current_period_end: number
-    cancel_at_period_end: boolean
-  } | null = null
+
+  let portalUrl: string | null = null
 
   if (profile?.stripe_customer_id) {
     try {
-      // Fetch invoices (subscriptions + one-time with invoice_creation enabled)
-      const invoiceList = await stripe.invoices.list({
-        customer: profile.stripe_customer_id,
-        limit: 10,
-      })
-      invoices = invoiceList.data.map(inv => ({
+      const [invoiceList, portalSession] = await Promise.all([
+        stripe.invoices.list({ customer: profile.stripe_customer_id, limit: 10 }),
+        stripe.billingPortal.sessions.create({
+          customer: profile.stripe_customer_id,
+          return_url: `${appUrl}/dashboard/billing`,
+        }),
+      ])
+
+      invoices = invoiceList.data.map((inv) => ({
         id: inv.id,
         number: inv.number ?? null,
         amount_paid: inv.amount_paid,
         status: inv.status ?? null,
         created: inv.created,
-        invoice_pdf: inv.invoice_pdf ?? null,
         hosted_invoice_url: inv.hosted_invoice_url ?? null,
       }))
 
-      // Fallback: pull payment intents for one-time payments made before invoice_creation was enabled
-      if (invoices.length === 0) {
-        const paymentIntents = await stripe.paymentIntents.list({
-          customer: profile.stripe_customer_id,
-          limit: 10,
-        })
-        invoices = paymentIntents.data
-          .filter(pi => pi.status === 'succeeded')
-          .map(pi => ({
-            id: pi.id,
-            number: null,
-            amount_paid: pi.amount,
-            status: 'paid',
-            created: pi.created,
-            invoice_pdf: null,
-            hosted_invoice_url: null,
-          }))
-      }
-
-      if (profile.stripe_subscription_id) {
-        const sub = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
-        subscription = {
-          status: sub.status,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          current_period_end: (sub as any).current_period_end,
-          cancel_at_period_end: sub.cancel_at_period_end,
-        }
-      }
+      portalUrl = portalSession.url
     } catch (err) {
       console.error('Stripe fetch error:', err)
     }
@@ -87,9 +60,11 @@ export default async function BillingPage() {
 
   return (
     <BillingClient
-      profile={profile}
+      plan={profile?.plan ?? null}
+      status={profile?.status ?? null}
+      subscriptionId={profile?.stripe_subscription_id ?? null}
       invoices={invoices}
-      subscription={subscription}
+      portalUrl={portalUrl}
     />
   )
 }
