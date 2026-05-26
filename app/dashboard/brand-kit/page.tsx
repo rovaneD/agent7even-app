@@ -5,6 +5,7 @@ import BrandKitClient from './BrandKitClient'
 import { Lock } from 'lucide-react'
 import Link from 'next/link'
 import Stripe from 'stripe'
+import { getTeamPermissions, hasPermission } from '@/lib/teamPermissions'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-04-22.dahlia',
@@ -23,6 +24,9 @@ export default async function BrandKitPage() {
     .single()
 
   if (!profile) redirect('/dashboard')
+
+  const teamPerms = await getTeamPermissions(profile.id)
+  if (!hasPermission(teamPerms, 'brand_kit')) redirect('/dashboard')
 
   // Check if on trial
   let onTrial = false

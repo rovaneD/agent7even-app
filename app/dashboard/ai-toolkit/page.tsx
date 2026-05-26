@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import AIToolkitClient from './AIToolkitClient'
+import { getTeamPermissions, hasPermission } from '@/lib/teamPermissions'
 
 export default async function AIToolkitPage() {
   const { userId } = await auth()
@@ -16,6 +17,9 @@ export default async function AIToolkitPage() {
     .single()
 
   if (!profile) redirect('/dashboard')
+
+  const teamPerms = await getTeamPermissions(profile.id)
+  if (!hasPermission(teamPerms, 'ai_toolkit')) redirect('/dashboard')
 
   // Fetch prompt library
   const { data: prompts } = await supabase

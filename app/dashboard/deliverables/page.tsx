@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import DeliverablesClient from './DeliverablesClient'
+import { getTeamPermissions, hasPermission } from '@/lib/teamPermissions'
 
 export default async function DeliverablesPage() {
   const { userId } = await auth()
@@ -16,6 +17,9 @@ export default async function DeliverablesPage() {
     .single()
 
   if (!profile) redirect('/dashboard')
+
+  const teamPerms = await getTeamPermissions(profile.id)
+  if (!hasPermission(teamPerms, 'deliverables')) redirect('/dashboard')
 
   const { data: deliverables } = await supabase
     .from('deliverables')

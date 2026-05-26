@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import AnalyticsClient from './AnalyticsClient'
+import { getTeamPermissions, hasPermission } from '@/lib/teamPermissions'
 
 export default async function AnalyticsPage() {
   const { userId } = await auth()
@@ -11,6 +12,7 @@ export default async function AnalyticsPage() {
   const { data: profile } = await supabase
     .from('profiles')
     .select(`
+      id,
       company_name,
       plan,
       ga_connected,
@@ -22,6 +24,11 @@ export default async function AnalyticsPage() {
     `)
     .eq('clerk_user_id', userId)
     .single()
+
+  if (profile?.id) {
+    const teamPerms = await getTeamPermissions(profile.id)
+    if (!hasPermission(teamPerms, 'analytics')) redirect('/dashboard')
+  }
 
   return (
     <AnalyticsClient

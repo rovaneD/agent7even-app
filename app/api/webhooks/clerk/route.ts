@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     const email = email_addresses?.[0]?.email_address ?? ''
     const fullName = [first_name, last_name].filter(Boolean).join(' ')
 
-    const { error } = await supabase.from('profiles').upsert({
+    const { data: newProfile, error } = await supabase.from('profiles').upsert({
       clerk_user_id: id,
       email,
       full_name: fullName,
@@ -56,10 +56,34 @@ export async function POST(req: Request) {
       role: 'client',
       status: 'onboarding',
       onboarding_complete: false,
-    }, { onConflict: 'clerk_user_id' })
+    }, { onConflict: 'clerk_user_id' }).select('id').single()
 
     if (error) {
       console.error('Supabase upsert error (user.created):', error)
+    }
+
+    // Activate any pending team invite for this email
+    if (newProfile?.id && email) {
+      const { data: pendingInvite } = await supabase
+        .from('team_members')
+        .select('id, account_id')
+        .eq('invited_email', email.toLowerCase())
+        .eq('status', 'pending')
+        .single()
+
+      if (pendingInvite) {
+        await supabase.from('team_members').update({
+          member_profile_id: newProfile.id,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        }).eq('id', pendingInvite.id)
+
+        await supabase.from('profiles').update({
+          account_id: pendingInvite.account_id,
+          is_account_owner: false,
+          updated_at: new Date().toISOString(),
+        }).eq('id', newProfile.id)
+      }
     }
 
     // Send welcome email

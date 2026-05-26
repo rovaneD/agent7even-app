@@ -18,6 +18,7 @@ import {
   X,
   Sparkles,
   Bell,
+  Users,
 } from 'lucide-react'
 import NotificationBell from '@/components/NotificationBell'
 
@@ -59,6 +60,7 @@ const NAV = [
     items: [
       { href: '/dashboard/support', label: 'Support', icon: Headphones },
       { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
+      { href: '/dashboard/team', label: 'Team', icon: Users },
       { href: '/dashboard/billing', label: 'Billing', icon: CreditCard },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },
     ],

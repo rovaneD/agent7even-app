@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import BillingClient from './BillingClient'
 import Stripe from 'stripe'
+import { getTeamPermissions, hasPermission } from '@/lib/teamPermissions'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-04-22.dahlia',
@@ -16,9 +17,14 @@ export default async function BillingPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('plan, status, stripe_customer_id, stripe_subscription_id')
+    .select('id, plan, status, stripe_customer_id, stripe_subscription_id')
     .eq('clerk_user_id', userId)
     .single()
+
+  if (profile?.id) {
+    const teamPerms = await getTeamPermissions(profile.id)
+    if (!hasPermission(teamPerms, 'billing')) redirect('/dashboard')
+  }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.agent7even.com'
 
