@@ -11,6 +11,7 @@ import {
   FileText,
   CheckCircle,
 } from 'lucide-react'
+import PlanBanner from './PlanBanner'
 
 export default async function DashboardPage() {
   const { userId } = await auth()
@@ -35,12 +36,6 @@ export default async function DashboardPage() {
   const displayName = profile?.company_name || profile?.full_name || 'there'
   const hasPlan = !!profile?.plan
 
-  const PLAN_LABELS: Record<string, string> = {
-    ai_sprint: 'AI Sprint',
-    growth: 'Growth',
-    done_for_you: 'Done For You',
-  }
-
   return (
     <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-5xl">
       <div className="mb-8">
@@ -61,15 +56,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {hasPlan && (
-        <div className="bg-[#c8522a]/5 border border-[#c8522a]/20 rounded-2xl p-4 mb-6 flex items-start sm:items-center gap-3">
-          <CheckCircle size={16} className="text-[#c8522a] flex-shrink-0 mt-0.5 sm:mt-0" />
-          <p className="text-sm text-gray-700">
-            You&apos;re on the <span className="font-semibold text-[#c8522a]">{PLAN_LABELS[profile.plan] ?? profile.plan}</span> plan. The Agent7even team has been notified and will be in touch shortly.
-          </p>
-          <Link href="/dashboard/billing" className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">Manage →</Link>
-        </div>
-      )}
+      {hasPlan && <PlanBanner plan={profile.plan} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
