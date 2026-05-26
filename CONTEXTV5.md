@@ -456,7 +456,7 @@ Sign-up → Onboarding → Checkout → Stripe, end-to-end without extra clicks.
 | `read` | boolean | |
 | `created_at` | timestamptz | |
 
-Realtime enabled: `alter publication supabase_realtime add table notifications`
+Realtime enabled: `alter publication supabase_realtime add table notifications` ✅ **confirmed in Supabase**
 
 Notification types in use: `order_status`, `order_delivered`, `support_reply`, `deliverable_uploaded`, `brand_kit_generated`, `plan_activated`, `inquiry_update`
 
@@ -560,13 +560,16 @@ Seeded rows:
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | FK → profiles.id |
-| `project_type` | text | |
+| `service_type` | text | `uiux`, `mobile_app`, `custom_dev` |
+| `project_name` | text | |
 | `description` | text | |
-| `has_assets` | boolean | |
-| `asset_notes` | text | |
+| `platform` | jsonb | Array of target platforms |
+| `has_existing_brand` | boolean | |
+| `has_existing_designs` | boolean | |
 | `timeline` | text | |
-| `budget` | text | |
-| `status` | text | `submitted`, `reviewing`, `proposal_sent`, `accepted`, `declined`, `closed` |
+| `budget_range` | text | |
+| `additional_notes` | text | |
+| `status` | text | `new`, `reviewing`, `proposal_sent`, `accepted`, `declined`, `closed` |
 | `admin_notes` | text | |
 | `proposal_url` | text | |
 | `created_at` / `updated_at` | timestamptz | |
@@ -582,7 +585,7 @@ Seeded rows:
 | `status` | text | `pending`, `active`, `removed` |
 | `invited_email` | text | |
 | `invite_token` | uuid | One-time token for the invite link |
-| `created_at` / `updated_at` | timestamptz | |
+| `created_at` | timestamptz | Note: no `updated_at` column in current schema |
 
 ---
 
@@ -897,47 +900,18 @@ Blog lives at `agent7even.com/blog` — 9 published posts, content in `src/conte
 - Submit `instagram_manage_insights` for app review with screen recordings
 - Until approved: Instagram follower count shows, reach/impressions unavailable
 
-### 3. Supabase migrations for V5 tables — REQUIRED before team features work
-Run these in Supabase SQL Editor if not already done:
-```sql
--- Add team columns to profiles
-alter table profiles add column if not exists is_account_owner boolean default true;
-alter table profiles add column if not exists account_id uuid references profiles(id);
+### 3. Supabase migrations for V5 tables — ✅ ALL CONFIRMED IN PRODUCTION
+Verified May 26, 2026 via Supabase REST API + SQL Editor:
 
--- Create team_members table
-create table if not exists team_members (
-  id uuid primary key default gen_random_uuid(),
-  account_id uuid references profiles(id) not null,
-  member_profile_id uuid references profiles(id),
-  role text default 'member',
-  permissions jsonb default '{}',
-  status text default 'pending',
-  invited_email text not null,
-  invite_token uuid default gen_random_uuid(),
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+| Migration | Status |
+|---|---|
+| `profiles.is_account_owner` (boolean) | ✅ exists |
+| `profiles.account_id` (uuid) | ✅ exists |
+| `team_members` table — all columns | ✅ exists |
+| `project_inquiries` table — all columns | ✅ exists |
+| `notifications` Realtime publication | ✅ confirmed |
 
--- Create project_inquiries table
-create table if not exists project_inquiries (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references profiles(id) not null,
-  project_type text,
-  description text,
-  has_assets boolean default false,
-  asset_notes text,
-  timeline text,
-  budget text,
-  status text default 'submitted',
-  admin_notes text,
-  proposal_url text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
--- Enable realtime on notifications (if not already done)
-alter publication supabase_realtime add table notifications;
-```
+No SQL migrations needed — everything is already live.
 
 ### 4. Integrations — ROADMAP (build last)
 **Tier 1 — High value, build first:**
