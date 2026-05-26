@@ -534,7 +534,12 @@ function WebsiteAnalyticsSection({
     <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between rounded-t-2xl overflow-visible">
       <div className="flex items-center gap-3">
         <BrandIcon src="/google_analytics_icon.png" alt="Google Analytics" />
-        <h3 className="text-sm font-semibold text-gray-700">Website Analytics</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700">Google Analytics</h3>
+          {propertyId && (
+            <p className="text-xs text-gray-400">GA4 · Property {propertyId}</p>
+          )}
+        </div>
         <InfoTooltip text={tooltip} />
       </div>
       {badge}
@@ -861,7 +866,7 @@ export default function AnalyticsClient({
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Website sessions"
+          label="GA sessions"
           value={liveSessions !== null ? fmt(liveSessions) : '—'}
           icon={Globe}
           logoSrc="/google_analytics_icon.png"
@@ -903,7 +908,7 @@ export default function AnalyticsClient({
         </div>
       )}
 
-      {/* Website Analytics (GA) */}
+      {/* Google Analytics */}
       <WebsiteAnalyticsSection
         propertyId={gaId}
         oauthConnected={oauthConnected}
