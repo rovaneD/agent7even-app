@@ -65,7 +65,7 @@ export default async function DashboardPage() {
         <div className="bg-[#c8522a]/5 border border-[#c8522a]/20 rounded-2xl p-4 mb-6 flex items-start sm:items-center gap-3">
           <CheckCircle size={16} className="text-[#c8522a] flex-shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-sm text-gray-700">
-            You&apos;re on the <span className="font-semibold text-[#c8522a]">{PLAN_LABELS[profile.plan] ?? profile.plan}</span> plan. Your team has been notified and will be in touch shortly.
+            You&apos;re on the <span className="font-semibold text-[#c8522a]">{PLAN_LABELS[profile.plan] ?? profile.plan}</span> plan. The Agent7even team has been notified and will be in touch shortly.
           </p>
           <Link href="/dashboard/billing" className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">Manage →</Link>
         </div>
