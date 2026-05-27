@@ -8,9 +8,16 @@ export async function POST(req: NextRequest) {
       clerk_user_id,
       company_name,
       business_type,
+      ideal_customer,
       business_goals,
       website_url,
       instagram_handle,
+      sell_locations,
+      marketing_budget,
+      competitors,
+      top_goals,
+      marketing_challenge,
+      content_comfort,
     } = body
 
     if (!clerk_user_id) {
@@ -24,9 +31,16 @@ export async function POST(req: NextRequest) {
       .update({
         company_name: company_name || null,
         business_type: business_type || null,
+        ideal_customer: ideal_customer || null,
         business_goals: business_goals || [],
         website_url: website_url || null,
         instagram_handle: instagram_handle || null,
+        sell_locations: sell_locations || [],
+        marketing_budget: marketing_budget || null,
+        competitors: competitors || [],
+        top_goals: top_goals || [],
+        marketing_challenge: marketing_challenge || null,
+        content_comfort: content_comfort || null,
         onboarding_complete: true,
         status: 'active',
         updated_at: new Date().toISOString(),

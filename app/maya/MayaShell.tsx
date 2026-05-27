@@ -1,27 +1,79 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import Link from 'next/link'
+import ReactMarkdown from 'react-markdown'
+import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport, UIMessage } from 'ai'
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface Props {
   companyName: string
   businessType: string
   plan: string
+  websiteUrl?: string
+  instagramHandle?: string
+  businessGoals?: string[]
+  idealCustomer?: string
+  sellLocations?: string[]
+  marketingBudget?: string
+  competitors?: string[]
+  topGoals?: string[]
+  marketingChallenge?: string
+  contentComfort?: string
+  pendingApprovalCount?: number
 }
 
-const NAV = [
-  { icon: 'ti-message-circle', label: 'Talk to Maya', id: 'maya' },
-  { icon: 'ti-layout-grid', label: 'My campaigns', id: 'campaigns' },
-  { icon: 'ti-calendar', label: 'Content calendar', id: 'calendar' },
-  { icon: 'ti-chart-bar', label: 'Results', id: 'results' },
-  { icon: 'ti-heart', label: 'Saved', id: 'saved' },
-  { icon: 'ti-sparkles', label: 'Brand kit', id: 'brand' },
-  { icon: 'ti-shopping-bag', label: 'Services', id: 'services' },
+type CanvasState = 'default' | 'building' | 'plan'
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const PLAN_TRIGGERS = [
+  '30-day', "here's your plan", 'week 1', 'week 2',
+  'your plan', 'put it together', 'here is your',
+  'let me put something together', "i've got what i need",
+]
+
+function isPlanResponse(text: string) {
+  return PLAN_TRIGGERS.some(t => text.toLowerCase().includes(t))
+}
+
+const SECTION_KEYWORDS = /\b(week|content|email|social|ads|paid|organic|strategy|brand|launch|phase|copy|instagram|facebook|seo|blog|reels|video|campaign|goals?|overview|summary)\b/i
+
+function extractPlanSections(text: string): { title: string; body: string }[] {
+  const lines = text.split('\n')
+  const sections: { title: string; body: string }[] = []
+  let current: { title: string; body: string } | null = null
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) continue
+    const isHeader =
+      (line.endsWith(':') && line.length < 60) ||
+      (SECTION_KEYWORDS.test(line) && line.length < 50 && !line.includes('.'))
+    if (isHeader) {
+      if (current) sections.push(current)
+      current = { title: line.replace(/:$/, '').trim(), body: '' }
+    } else if (current) {
+      const stripped = line.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^[-*+]\s+/gm, '• ').trim()
+      if (stripped) current.body += (current.body ? '\n' : '') + stripped
+    }
+  }
+  if (current) sections.push(current)
+  if (sections.length < 2) return [{ title: 'Your plan', body: text.replace(/[*#]/g, '').trim() }]
+  return sections.slice(0, 8)
+}
+
+// ── Static nav ─────────────────────────────────────────────────────────────
+
+const NAV_ITEMS = [
+  { icon: 'ti-message-circle', label: 'Talk to Maya', id: 'maya', href: '/maya' },
+  { icon: 'ti-layout-grid', label: 'My campaigns', id: 'campaigns', href: null },
+  { icon: 'ti-calendar', label: 'Content calendar', id: 'calendar', href: null },
+  { icon: 'ti-chart-bar', label: 'Results', id: 'results', href: null },
+  { icon: 'ti-robot', label: 'Agents', id: 'agents', href: '/dashboard/agents' },
+  { icon: 'ti-heart', label: 'Saved', id: 'saved', href: null },
+  { icon: 'ti-sparkles', label: 'Brand kit', id: 'brand', href: null },
+  { icon: 'ti-shopping-bag', label: 'Services', id: 'services', href: null },
 ]
 
 const SUGGESTIONS = [
@@ -30,781 +82,433 @@ const SUGGESTIONS = [
   { icon: 'ti-eye', text: 'Help me stand out from competitors' },
 ]
 
-const COMPETITOR_CARDS = [
-  {
-    initials: 'FS',
-    name: 'Fresh Start Co.',
-    time: '2h ago',
-    caption: 'New arrivals just landed — spring collection is here and it\'s everything you\'ve been waiting for. Limited stock.',
-    likes: 847,
-    comments: 62,
-    shares: 118,
-    tip: 'They\'re leading with scarcity + season. Your audience responds well to "limited" framing — try pairing it with a specific number.',
-  },
-  {
-    initials: 'BL',
-    name: 'Bloom & Co.',
-    time: '5h ago',
-    caption: 'Customer story: how Sarah went from overwhelmed to thriving using our weekly system. Read the full story on the blog.',
-    likes: 1204,
-    comments: 91,
-    shares: 203,
-    tip: 'Social proof is outperforming product posts 3:1 in this niche right now. One real customer story beats ten product photos.',
-  },
-]
+// ── ReactMarkdown plain components (no bubble styles, just text) ───────────
 
-export default function MayaShell({ companyName, businessType, plan }: Props) {
+const PLAIN_MD: Record<string, React.ComponentType<{ children?: React.ReactNode }>> = {
+  p: ({ children }) => <p style={{ margin: '0 0 12px 0', fontSize: 14, lineHeight: 1.7, color: '#0a0a0a' }}>{children}</p>,
+  strong: ({ children }) => <span style={{ fontWeight: 500, color: '#0a0a0a' }}>{children}</span>,
+  em: ({ children }) => <span style={{ fontStyle: 'italic', color: '#444' }}>{children}</span>,
+  ul: ({ children }) => <ul style={{ paddingLeft: 16, margin: '0 0 12px 0' }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ paddingLeft: 16, margin: '0 0 12px 0' }}>{children}</ol>,
+  li: ({ children }) => <li style={{ marginBottom: 6, fontSize: 14, lineHeight: 1.65 }}>{children}</li>,
+  h1: ({ children }) => <p style={{ fontSize: 14, fontWeight: 500, color: '#0a0a0a', margin: '0 0 8px 0' }}>{children}</p>,
+  h2: ({ children }) => <p style={{ fontSize: 14, fontWeight: 500, color: '#0a0a0a', margin: '0 0 8px 0' }}>{children}</p>,
+  h3: ({ children }) => <p style={{ fontSize: 13, fontWeight: 500, color: '#555', margin: '0 0 6px 0' }}>{children}</p>,
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+export default function MayaShell({
+  companyName, businessType, websiteUrl, instagramHandle, businessGoals,
+  idealCustomer, sellLocations, marketingBudget, competitors = [],
+  topGoals, marketingChallenge, contentComfort, pendingApprovalCount = 0,
+}: Props) {
   const [activeNav, setActiveNav] = useState('maya')
-  const [activeTab, setActiveTab] = useState<'competitors' | 'inspiration' | 'campaigns'>('competitors')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
-  const [chatStarted, setChatStarted] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [canvasOpen, setCanvasOpen] = useState(true)
+  const [canvasState, setCanvasState] = useState<CanvasState>('default')
+  const [planSections, setPlanSections] = useState<{ title: string; body: string }[]>([])
+  const [knownFacts, setKnownFacts] = useState<string[]>(() => {
+    const facts: string[] = []
+    if (companyName && companyName !== 'there') facts.push(companyName)
+    if (businessType) facts.push(businessType)
+    if (idealCustomer) facts.push(idealCustomer.slice(0, 30) + (idealCustomer.length > 30 ? '…' : ''))
+    if (marketingBudget) facts.push(marketingBudget)
+    if (topGoals?.length) facts.push(topGoals[0])
+    if (websiteUrl) facts.push(websiteUrl.replace(/^https?:\/\//, ''))
+    return facts.slice(0, 6)
+  })
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streaming])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const initials = companyName && companyName !== 'there' ? companyName.slice(0, 2).toUpperCase() : 'ME'
+  const displayName = companyName !== 'there' ? companyName : 'Your business'
 
-  const initials = companyName.slice(0, 2).toUpperCase()
+  const profile = {
+    companyName, businessType, idealCustomer, sellLocations,
+    marketingBudget, topGoals, marketingChallenge, contentComfort,
+    competitors, websiteUrl, instagramHandle,
+  }
 
-  async function sendMessage(text: string) {
-    if (!text.trim() || streaming) return
-    const userMsg: Message = { role: 'user', content: text.trim() }
-    const next = [...messages, userMsg]
-    setMessages(next)
-    setInput('')
-    setChatStarted(true)
-    setStreaming(true)
+  const [chatInput, setChatInput] = useState('')
+  const [agentRunning, setAgentRunning] = useState(false)
 
-    const assistantMsg: Message = { role: 'assistant', content: '' }
-    setMessages([...next, assistantMsg])
+  const ORCHESTRATE_TRIGGER = "i'm spinning up the campaign builder"
 
-    try {
-      const res = await fetch('/api/maya/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: next,
-          profile: { companyName, businessType },
-        }),
-      })
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/maya/chat',
+      body: { profile },
+    }),
+    onFinish: async ({ message }: { message: UIMessage }) => {
+      const text = message.parts.filter((p): p is { type: 'text'; text: string } => p.type === 'text').map(p => p.text).join('')
 
-      if (!res.ok || !res.body) throw new Error('Stream failed')
+      if (isPlanResponse(text)) {
+        setPlanSections(extractPlanSections(text))
+        setCanvasState('plan')
+      }
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let accumulated = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        // Parse SSE-style lines: data: <text>
-        const lines = chunk.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const token = line.slice(6)
-            if (token === '[DONE]') continue
-            accumulated += token
-            setMessages(prev => {
-              const updated = [...prev]
-              updated[updated.length - 1] = { role: 'assistant', content: accumulated }
-              return updated
-            })
-          }
+      // Maya is orchestrating — fire the Campaign Builder
+      if (text.toLowerCase().includes(ORCHESTRATE_TRIGGER)) {
+        setAgentRunning(true)
+        try {
+          await fetch('/api/agents/tasks/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agent: 'campaign_builder',
+              input: {
+                company_name: companyName,
+                business_type: businessType,
+                ideal_customer: idealCustomer,
+                top_goals: topGoals,
+                marketing_budget: marketingBudget,
+                competitors,
+                sell_locations: sellLocations,
+              },
+              priority: 'high',
+            }),
+          })
+        } catch {
+          // task creation failure is non-critical
         }
       }
-    } catch {
-      setMessages(prev => {
-        const updated = [...prev]
-        updated[updated.length - 1] = { role: 'assistant', content: 'Something went wrong. Please try again.' }
-        return updated
-      })
-    } finally {
-      setStreaming(false)
-    }
+    },
+  })
+
+  const isLoading = status === 'submitted' || status === 'streaming'
+
+  function getMsgText(msg: UIMessage) {
+    return msg.parts.filter((p): p is { type: 'text'; text: string } => p.type === 'text').map(p => p.text).join('')
+  }
+
+  const chatStarted = messages.length > 0
+  const sessionTitle = (() => {
+    const first = messages.find(m => m.role === 'user')
+    if (!first) return ''
+    const text = getMsgText(first)
+    return text.length > 40 ? text.slice(0, 40) + '\u2026' : text
+  })()
+
+  useEffect(() => {
+    const userMsgs = messages.filter(m => m.role === 'user')
+    if (userMsgs.length === 0) return
+    if (canvasState === 'default') setCanvasState('building')
+    const latest = userMsgs[userMsgs.length - 1]
+    const latestText = getMsgText(latest)
+    const snippet = latestText.length > 22 ? latestText.slice(0, 22) + '\u2026' : latestText
+    setKnownFacts(prev => [...new Set([...prev, snippet])].slice(0, 8))
+  }, [messages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isLoading])
+
+  function submitMessage(text?: string) {
+    const content = (text ?? chatInput).trim()
+    if (!content || isLoading) return
+    sendMessage({ text: content })
+    setChatInput('')
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage(input)
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitMessage() }
   }
 
-  function handleSuggestion(text: string) {
-    setInput(text)
-    setTimeout(() => sendMessage(text), 50)
-  }
+  const showThinking = isLoading && (messages.length === 0 || messages[messages.length - 1]?.role === 'user')
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: '100vh',
-        width: '100vw',
-        overflow: 'hidden',
-        fontFamily: 'var(--font-geist), system-ui, sans-serif',
-        background: '#fff',
-      }}
-    >
-      {/* ── LEFT SIDEBAR ── */}
-      <div
-        style={{
-          width: 200,
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#fff',
-          borderRight: '0.5px solid #ebebeb',
-          padding: '16px 12px',
-        }}
-      >
-        {/* Logo */}
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'var(--font-geist), system-ui, sans-serif', background: '#fff' }}>
+
+      {/* ═══ NAV SIDEBAR ═══ */}
+      <aside style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#fff', borderRight: '0.5px solid #ebebeb', padding: '16px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, paddingLeft: 4 }}>
-          <div
-            style={{
-              width: 24,
-              height: 24,
-              background: '#0a0a0a',
-              borderRadius: 5,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ width: 24, height: 24, background: '#0a0a0a', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>7</span>
           </div>
           <span style={{ fontSize: 13, fontWeight: 500, color: '#0a0a0a', letterSpacing: '-0.2px' }}>Agent7even</span>
         </div>
-
-        {/* New campaign button */}
-        <button
-          style={{
-            width: '100%',
-            background: '#0a0a0a',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            padding: '8px 12px',
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            marginBottom: 8,
-            fontFamily: 'inherit',
-          }}
-        >
+        <button style={{ width: '100%', background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontFamily: 'inherit' }}>
           <i className="ti ti-plus" style={{ fontSize: 14 }} />
           New campaign
         </button>
-
-        {/* Nav */}
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {NAV.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const isActive = activeNav === item.id
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveNav(item.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '7px 8px',
-                  borderRadius: 7,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 12.5,
-                  fontWeight: isActive ? 500 : 400,
-                  color: isActive ? '#0a0a0a' : '#bbb',
-                  background: isActive ? '#f0f0f0' : 'transparent',
-                  width: '100%',
-                  textAlign: 'left',
-                  transition: 'background 0.1s, color 0.1s',
-                  fontFamily: 'inherit',
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    ;(e.currentTarget as HTMLButtonElement).style.background = '#f5f5f5'
-                    ;(e.currentTarget as HTMLButtonElement).style.color = '#555'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-                    ;(e.currentTarget as HTMLButtonElement).style.color = '#bbb'
-                  }
-                }}
-              >
+            const inner = (
+              <>
                 <i className={`ti ${item.icon}`} style={{ fontSize: 15, flexShrink: 0 }} />
-                {item.label}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.id === 'agents' && pendingApprovalCount > 0 && (
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#0a0a0a', flexShrink: 0 }} />
+                )}
+              </>
+            )
+            const sharedStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: isActive ? 500 : 400, color: isActive ? '#0a0a0a' : '#bbb', background: isActive ? '#f0f0f0' : 'transparent', width: '100%', textAlign: 'left', fontFamily: 'inherit', textDecoration: 'none' }
+            if (item.href) {
+              return (
+                <a key={item.id} href={item.href} style={sharedStyle}
+                  onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.background = '#f5f5f5'; (e.currentTarget as HTMLAnchorElement).style.color = '#555' } }}
+                  onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = '#bbb' } }}
+                >
+                  {inner}
+                </a>
+              )
+            }
+            return (
+              <button key={item.id} onClick={() => setActiveNav(item.id)} style={sharedStyle}
+                onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = '#f5f5f5'; (e.currentTarget as HTMLButtonElement).style.color = '#555' } }}
+                onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#bbb' } }}
+              >
+                {inner}
               </button>
             )
           })}
         </nav>
-
-        {/* Footer */}
-        <div
-          style={{
-            borderTop: '0.5px solid #f0f0f0',
-            paddingTop: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              background: '#0a0a0a',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
+        <div style={{ borderTop: '0.5px solid #f0f0f0', paddingTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>{initials}</span>
           </div>
-          <span style={{ fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {companyName}
-          </span>
+          <span style={{ fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
         </div>
-      </div>
+      </aside>
 
-      {/* ── CENTER PANEL ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0 }}>
+      {/* ═══ CHAT PANEL ═══ */}
+      <div style={{ flex: 55, minWidth: 480, maxWidth: 640, display: 'flex', flexDirection: 'column', background: '#fff', borderRight: '0.5px solid #ebebeb', overflow: 'hidden' }}>
+
         {/* Top bar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 20px',
-            borderBottom: '0.5px solid #f0f0f0',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#0a0a0a', flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: '#888', fontWeight: 400 }}>Maya is ready</span>
-          </div>
-          {businessType && (
-            <span style={{ fontSize: 12, color: '#bbb' }}>{businessType}</span>
-          )}
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '0.5px solid #f0f0f0' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#0a0a0a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>
+            {chatStarted && sessionTitle ? sessionTitle : 'Maya'}
+          </span>
+          <button onClick={() => setCanvasOpen(o => !o)} title={canvasOpen ? 'Collapse canvas' : 'Expand canvas'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#555' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#bbb' }}
+          >
+            <i className={`ti ${canvasOpen ? 'ti-layout-sidebar' : 'ti-layout-sidebar-right'}`} style={{ fontSize: 16 }} />
+          </button>
         </div>
 
-        {/* Body */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Messages */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
           {!chatStarted ? (
-            /* ── GREETING STATE ── */
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 24px 40px',
-              }}
-            >
-              {/* Maya avatar */}
-              <div
-                style={{
-                  width: 70,
-                  height: 70,
-                  borderRadius: '50%',
-                  border: '0.5px solid #e5e5e5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  marginBottom: 16,
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    width: 58,
-                    height: 58,
-                    borderRadius: '50%',
-                    background: '#0a0a0a',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <span style={{ color: '#fff', fontSize: 22, fontWeight: 600 }}>M</span>
+            /* GREETING */
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingBottom: 48 }}>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', border: '0.5px solid #e5e5e5', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 14 }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: '#fff', fontSize: 20, fontWeight: 600 }}>M</span>
                 </div>
-                {/* Pip */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    right: 4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    background: '#0a0a0a',
-                    border: '1.5px solid #fff',
-                  }}
-                />
+                <div style={{ position: 'absolute', bottom: 3, right: 3, width: 9, height: 9, borderRadius: '50%', background: '#0a0a0a', border: '1.5px solid #fff' }} />
               </div>
-
-              <p
-                style={{
-                  fontSize: 11,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.8px',
-                  color: '#ccc',
-                  marginBottom: 14,
-                }}
-              >
-                Maya · Your marketing strategist
+              <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#ccc', marginBottom: 12 }}>Maya · Your marketing strategist</p>
+              <p style={{ fontSize: 20, fontWeight: 500, color: '#0a0a0a', marginBottom: 8, textAlign: 'center', letterSpacing: '-0.3px' }}>
+                Hey {companyName !== 'there' ? companyName : 'there'}, good to see you.
               </p>
-
-              <p
-                style={{
-                  fontSize: 22,
-                  fontWeight: 500,
-                  color: '#0a0a0a',
-                  marginBottom: 10,
-                  textAlign: 'center',
-                  letterSpacing: '-0.4px',
-                }}
-              >
-                Hey {companyName}, good to see you.
+              <p style={{ fontSize: 14, color: '#888', textAlign: 'center', maxWidth: 320, lineHeight: 1.6, marginBottom: 28 }}>
+                Ready to build something? Tell me what's on your mind — or pick a place to start.
               </p>
-
-              <p
-                style={{
-                  fontSize: 14,
-                  color: '#888',
-                  textAlign: 'center',
-                  maxWidth: 340,
-                  lineHeight: 1.6,
-                  marginBottom: 28,
-                }}
-              >
-                I've been keeping an eye on what's happening in your space. Ready to build something? Tell me what's on your mind — or pick a place to start.
-              </p>
-
-              {/* Suggestion pills */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 40 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, width: '100%', maxWidth: 340 }}>
                 {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s.text}
-                    onClick={() => handleSuggestion(s.text)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '8px 14px',
-                      borderRadius: 20,
-                      border: '0.5px solid #e8e8e8',
-                      background: '#fafafa',
-                      fontSize: 13,
-                      color: '#444',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      transition: 'border-color 0.15s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#0a0a0a' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e8e8e8' }}
+                  <button key={s.text} onClick={() => submitMessage(s.text)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 10, border: '0.5px solid #e8e8e8', background: '#fafafa', fontSize: 13, color: '#444', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'border-color 0.15s, background 0.15s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#0a0a0a'; (e.currentTarget as HTMLButtonElement).style.background = '#f5f5f5' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e8e8e8'; (e.currentTarget as HTMLButtonElement).style.background = '#fafafa' }}
                   >
-                    <i className={`ti ${s.icon}`} style={{ fontSize: 14, color: '#aaa' }} />
+                    <i className={`ti ${s.icon}`} style={{ fontSize: 14, color: '#bbb', flexShrink: 0 }} />
                     {s.text}
                   </button>
                 ))}
               </div>
-
-              {/* Input */}
-              <ChatInput
-                value={input}
-                onChange={setInput}
-                onSubmit={() => sendMessage(input)}
-                onKeyDown={handleKeyDown}
-                ref={inputRef}
-              />
-
-              <p style={{ fontSize: 11, color: '#ccc', marginTop: 10, textAlign: 'center' }}>
-                Maya knows your brand, your goals, and your market.
-              </p>
             </div>
           ) : (
-            /* ── CHAT STATE ── */
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: '24px 0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
-                }}
-              >
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      padding: '0 24px',
-                    }}
-                  >
-                    {msg.role === 'assistant' && msg.content === '' && streaming ? (
-                      <div
-                        style={{
-                          background: '#f5f5f5',
-                          borderRadius: 18,
-                          padding: '10px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        {[0, 1, 2].map(d => (
-                          <div
-                            key={d}
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              background: '#ccc',
-                              animation: 'pulse 1.2s ease-in-out infinite',
-                              animationDelay: `${d * 0.2}s`,
-                            }}
-                          />
-                        ))}
+            /* CHAT */
+            <>
+              {messages.map((msg) => {
+                const text = getMsgText(msg)
+                return (
+                  <div key={msg.id} style={{ marginBottom: msg.role === 'user' ? 28 : 32 }}>
+                    {msg.role === 'user' ? (
+                      /* User bubble — dark, right aligned */
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ background: '#0a0a0a', color: '#fff', borderRadius: '18px 18px 4px 18px', padding: '10px 14px', maxWidth: '72%', fontSize: 14, lineHeight: 1.55 }}>
+                          {text}
+                        </div>
                       </div>
                     ) : (
-                      <div
-                        style={{
-                          maxWidth: '75%',
-                          background: msg.role === 'user' ? '#0a0a0a' : '#f5f5f5',
-                          color: msg.role === 'user' ? '#fff' : '#0a0a0a',
-                          borderRadius: 18,
-                          padding: '10px 14px',
-                          fontSize: 14,
-                          lineHeight: 1.6,
-                          whiteSpace: 'pre-wrap',
-                        }}
-                      >
-                        {msg.content}
+                      /* Maya — plain text, no bubble */
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                          <span style={{ color: '#fff', fontSize: 12, fontWeight: 500 }}>M</span>
+                        </div>
+                        <div style={{ maxWidth: '85%', paddingTop: 4 }}>
+                          <ReactMarkdown components={PLAIN_MD as never}>{text}</ReactMarkdown>
+                        </div>
                       </div>
                     )}
                   </div>
-                ))}
-                <div ref={bottomRef} />
-              </div>
+                )
+              })}
 
-              {/* Input bar at bottom */}
-              <div style={{ padding: '12px 24px 20px', flexShrink: 0 }}>
-                <ChatInput
-                  value={input}
-                  onChange={setInput}
-                  onSubmit={() => sendMessage(input)}
-                  onKeyDown={handleKeyDown}
-                  ref={inputRef}
-                />
-              </div>
-            </div>
+              {/* Thinking state */}
+              {showThinking && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 28 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                    <span style={{ color: '#fff', fontSize: 12, fontWeight: 500 }}>M</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic', paddingTop: 7 }}>Maya is thinking...</p>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </>
           )}
+        </div>
+
+        {/* Input bar */}
+        <div style={{ flexShrink: 0, borderTop: '0.5px solid #f0f0f0', padding: '14px 20px', background: '#fff' }}>
+          <div style={{ position: 'relative' }}>
+            <textarea
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Maya anything..."
+              rows={1}
+              disabled={isLoading}
+              style={{ width: '100%', border: '0.5px solid #e0e0e0', borderRadius: 24, padding: '11px 48px 11px 16px', fontSize: 14, background: '#fafafa', color: '#0a0a0a', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box', display: 'block', opacity: isLoading ? 0.6 : 1 }}
+            />
+            <button onClick={() => submitMessage()} disabled={isLoading}
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: '50%', background: isLoading ? '#ccc' : '#0a0a0a', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isLoading ? 'not-allowed' : 'pointer' }}
+            >
+              <i className="ti ti-arrow-up" style={{ fontSize: 15, color: '#fff' }} />
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: '#ddd', textAlign: 'center', marginTop: 8 }}>
+            Maya makes mistakes. Verify important decisions.
+          </p>
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div
-        style={{
-          width: 284,
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#fafafa',
-          borderLeft: '0.5px solid #ebebeb',
-        }}
-      >
-        {/* Tabs */}
-        <div
-          style={{
-            display: 'flex',
-            padding: '12px 12px 0',
-            gap: 2,
-            borderBottom: '0.5px solid #ebebeb',
-            flexShrink: 0,
-          }}
-        >
-          {(['competitors', 'inspiration', 'campaigns'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                flex: 1,
-                padding: '7px 4px',
-                fontSize: 12,
-                fontWeight: activeTab === tab ? 500 : 400,
-                color: activeTab === tab ? '#0a0a0a' : '#aaa',
-                background: activeTab === tab ? '#f0f0f0' : 'transparent',
-                border: 'none',
-                borderRadius: '6px 6px 0 0',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                textTransform: 'capitalize',
-                marginBottom: -1,
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      {/* ═══ WORKING CANVAS ═══ */}
+      <div style={{ flex: canvasOpen ? 45 : 0, minWidth: canvasOpen ? 360 : 0, overflow: 'hidden', transition: 'flex 0.3s ease, min-width 0.3s ease', display: 'flex', flexDirection: 'column', background: '#fafafa' }}>
 
-        {/* Tab content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
-          {activeTab === 'competitors' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                  Trending in your space
-                </span>
-                <button style={{ fontSize: 11, color: '#aaa', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Refresh
-                </button>
-              </div>
+        {/* DEFAULT: empty state */}
+        {canvasState === 'default' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+            <i className="ti ti-layout-kanban" style={{ fontSize: 48, color: '#e0e0e0', marginBottom: 16 }} />
+            <p style={{ fontSize: 14, color: '#ccc', marginBottom: 6 }}>Your working space</p>
+            <p style={{ fontSize: 12, color: '#ddd', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
+              References, samples, and your campaign will appear here as Maya builds.
+            </p>
+          </div>
+        )}
 
-              {COMPETITOR_CARDS.map((card) => (
-                <div key={card.initials} style={{ marginBottom: 10 }}>
-                  {/* Card */}
-                  <div
-                    style={{
-                      background: '#fff',
-                      border: '0.5px solid #ebebeb',
-                      borderRadius: 10,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {/* Image placeholder */}
-                    <div
-                      style={{
-                        height: 72,
-                        background: '#f5f5f5',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <i className="ti ti-hanger" style={{ fontSize: 22, color: '#ccc' }} />
-                    </div>
-                    {/* Body */}
-                    <div style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
-                        <div
-                          style={{
-                            width: 22,
-                            height: 22,
-                            borderRadius: '50%',
-                            background: '#0a0a0a',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <span style={{ color: '#fff', fontSize: 8, fontWeight: 600 }}>{card.initials}</span>
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: '#0a0a0a', flex: 1 }}>{card.name}</span>
-                        <span style={{ fontSize: 11, color: '#ccc' }}>{card.time}</span>
-                      </div>
-                      <p style={{ fontSize: 12, color: '#666', lineHeight: 1.5, marginBottom: 8 }}>{card.caption}</p>
-                      <div style={{ display: 'flex', gap: 10 }}>
-                        {[
-                          { icon: 'ti-heart', val: card.likes },
-                          { icon: 'ti-message-circle', val: card.comments },
-                          { icon: 'ti-share', val: card.shares },
-                        ].map(s => (
-                          <span key={s.icon} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#aaa' }}>
-                            <i className={`ti ${s.icon}`} style={{ fontSize: 12 }} />
-                            {s.val.toLocaleString()}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  {/* Maya's take */}
-                  <div
-                    style={{
-                      background: '#f5f5f5',
-                      border: '0.5px solid #ebebeb',
-                      borderRadius: '0 0 8px 8px',
-                      padding: '8px 10px',
-                      marginTop: -1,
-                    }}
-                  >
-                    <p style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>
-                      <span style={{ fontWeight: 600, color: '#0a0a0a' }}>Maya's take: </span>
-                      {card.tip}
-                    </p>
-                  </div>
-                </div>
-              ))}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Watch list</span>
-                <button style={{ fontSize: 11, color: '#aaa', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  + Add
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'inspiration' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {[
-                { bg: '#efefef' },
-                { bg: '#e8e8e8' },
-                { bg: '#f2f2f2' },
-                { dashed: true },
-              ].map((tile, i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: 100,
-                    borderRadius: 10,
-                    background: tile.dashed ? 'transparent' : tile.bg,
-                    border: tile.dashed ? '0.5px dashed #ccc' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {tile.dashed && <i className="ti ti-plus" style={{ fontSize: 18, color: '#ccc' }} />}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activeTab === 'campaigns' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Active campaign */}
-              <div style={{ background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 10, padding: '10px 12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: '#0a0a0a' }}>Spring Push</span>
-                  <span style={{ fontSize: 10, background: '#f0f0f0', color: '#888', padding: '2px 7px', borderRadius: 20 }}>Active</span>
-                </div>
-                <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.5 }}>14 pieces · 8 published · ends Jun 1</p>
-              </div>
-
-              {/* Draft */}
-              <div style={{ background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 10, padding: '10px 12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: '#0a0a0a' }}>Summer Launch</span>
-                  <span style={{ fontSize: 10, background: '#f0f0f0', color: '#aaa', padding: '2px 7px', borderRadius: 20 }}>Draft</span>
-                </div>
-                <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.5 }}>Not started · 0 pieces</p>
-              </div>
-
-              {/* Maya suggests */}
-              <div style={{ background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 10, padding: '10px 12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: '#888' }}>Maya suggests</span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      background: '#0a0a0a',
-                      color: '#fff',
-                      padding: '2px 8px',
-                      borderRadius: 20,
-                      fontWeight: 500,
-                    }}
-                  >
-                    Build this
+        {/* BUILDING: what Maya knows + competitors */}
+        {canvasState === 'building' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Known facts strip */}
+            <div style={{ flexShrink: 0, borderBottom: '0.5px solid #f0f0f0', padding: '14px 20px', background: '#fafafa' }}>
+              <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#ccc', marginBottom: 8 }}>What Maya knows</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {knownFacts.map((fact, i) => (
+                  <span key={fact} style={{ fontSize: 12, color: '#555', background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 20, padding: '4px 12px', lineHeight: 1.4, animation: 'fadeIn 0.4s ease', animationDelay: `${i * 0.05}s`, animationFillMode: 'both' }}>
+                    {fact}
                   </span>
-                </div>
-                <p style={{ fontSize: 12, fontWeight: 500, color: '#0a0a0a', marginBottom: 4 }}>Re-engagement blast</p>
-                <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.5 }}>3-email sequence targeting customers who haven't purchased in 60 days.</p>
+                ))}
               </div>
             </div>
-          )}
-        </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+
+              {/* Competitor cards — pre-populated from profile or static fallback */}
+              <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#bbb', marginBottom: 12 }}>Competitors</p>
+
+              {competitors.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                  {competitors.map((handle, i) => {
+                    const clean = handle.replace(/^@/, '')
+                    const abbrev = clean.slice(0, 2).toUpperCase()
+                    return (
+                      <div key={i} style={{ background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <span style={{ color: '#fff', fontSize: 11, fontWeight: 600 }}>{abbrev}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: '#0a0a0a', marginBottom: 2 }}>@{clean}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0a0a0a', animation: 'dotPulse 2s ease-in-out infinite', animationDelay: `${i * 0.3}s` }} />
+                            <span style={{ fontSize: 11, color: '#bbb' }}>Watching...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ background: '#fff', border: '0.5px dashed #e0e0e0', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+                  <p style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>+ Add competitors</p>
+                  <p style={{ fontSize: 11, color: '#bbb', lineHeight: 1.5 }}>
+                    I can suggest competitors based on your industry — just ask me.
+                  </p>
+                </div>
+              )}
+
+              {/* Agent running indicator */}
+              {agentRunning && (
+                <div style={{ background: '#0a0a0a', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', animation: 'dotPulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
+                  <div>
+                    <p style={{ fontSize: 12.5, fontWeight: 500, color: '#fff', marginBottom: 2 }}>Campaign Builder is running...</p>
+                    <p style={{ fontSize: 11, color: '#888' }}>Your 30-day plan will appear here when ready</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Maya insight card */}
+              <div style={{ background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 10, padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: '#bbb' }}>Maya</span>
+                </div>
+                <p style={{ fontSize: 13, color: '#555', lineHeight: 1.65, fontStyle: 'italic' }}>
+                  Social proof is outperforming product posts 3:1 in most niches right now. One real customer story beats ten product photos.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PLAN: structured plan cards */}
+        {canvasState === 'plan' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+            <p style={{ fontSize: 18, fontWeight: 500, color: '#0a0a0a', marginBottom: 4, letterSpacing: '-0.3px' }}>Your 30-day plan</p>
+            <p style={{ fontSize: 12, color: '#aaa', marginBottom: 24 }}>
+              {displayName} · {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {planSections.map((section, i) => (
+                <div key={i} style={{ background: '#fff', border: '0.5px solid #ebebeb', borderRadius: 10, padding: 16 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0a0a0a', marginBottom: section.body ? 8 : 0 }}>{section.title}</p>
+                  {section.body && <p style={{ fontSize: 13, color: '#666', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{section.body}</p>}
+                </div>
+              ))}
+            </div>
+            <button style={{ width: '100%', background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 20 }}>
+              Save plan
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
-        @keyframes pulse {
+        @keyframes dotPulse {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
   )
 }
-
-// ── Chat input sub-component ──
-
-interface ChatInputProps {
-  value: string
-  onChange: (v: string) => void
-  onSubmit: () => void
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
-}
-
-const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ value, onChange, onSubmit, onKeyDown }, ref) => {
-    return (
-      <div style={{ position: 'relative', width: '100%', maxWidth: 480, margin: '0 auto' }}>
-        <textarea
-          ref={ref}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Ask Maya anything about your marketing..."
-          rows={1}
-          style={{
-            width: '100%',
-            border: '0.5px solid #e0e0e0',
-            borderRadius: 24,
-            padding: '13px 50px 13px 18px',
-            fontSize: 13.5,
-            background: '#fafafa',
-            color: '#0a0a0a',
-            resize: 'none',
-            outline: 'none',
-            fontFamily: 'var(--font-geist), system-ui, sans-serif',
-            lineHeight: 1.5,
-            boxSizing: 'border-box',
-            display: 'block',
-          }}
-        />
-        <button
-          onClick={onSubmit}
-          style={{
-            position: 'absolute',
-            right: 8,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            background: '#0a0a0a',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <i className="ti ti-arrow-up" style={{ fontSize: 15, color: '#fff' }} />
-        </button>
-      </div>
-    )
-  }
-)
-ChatInput.displayName = 'ChatInput'

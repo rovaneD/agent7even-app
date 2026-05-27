@@ -1,78 +1,72 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
+import { runAgent } from '@/lib/ai/runAgent'
 
 interface Profile {
   companyName: string
   businessType: string
+  idealCustomer?: string
+  sellLocations?: string[]
+  marketingBudget?: string
+  topGoals?: string[]
+  marketingChallenge?: string
+  contentComfort?: string
+  competitors?: string[]
+  websiteUrl?: string
+  instagramHandle?: string
 }
 
 export async function POST(req: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { messages, profile }: { messages: Message[]; profile: Profile } = await req.json()
+  const { messages, profile }: { messages: { role: 'user' | 'assistant'; content: string }[]; profile: Profile } = await req.json()
 
   if (!messages?.length) {
     return NextResponse.json({ error: 'No messages provided' }, { status: 400 })
   }
 
-  const systemPrompt = `You are Maya, a senior marketing strategist at Agent7even. You specialize in helping small businesses build their first real marketing system.
+  const p = profile ?? {}
+  const sellVia = p.sellLocations?.length ? p.sellLocations.join(', ') : 'not specified'
+  const goals = p.topGoals?.length ? p.topGoals.join(', ') : 'not specified'
+  const watchList = p.competitors?.length ? p.competitors.map(c => `@${c}`).join(', ') : 'none yet'
 
-You are warm, direct, and specific. You never use jargon. You never give generic advice. Every response is tailored to the specific business you are talking to.
+  const system = `You are Maya, a marketing strategist at Agent7even. You help small businesses build marketing that actually works.
 
-When a user tells you about their business, you ask smart follow-up questions to understand: what they sell, who buys it, what's working, what's not, and what they want to achieve.
+You already know everything about this business. Never ask for information you already have.
 
-When you have enough context, you build complete, specific, actionable marketing plans — not bullet point lists of vague suggestions. Real content. Real strategy. Real next steps.
+WHAT YOU KNOW:
+- Business: ${p.companyName || 'this business'}
+- Industry/type: ${p.businessType || 'not specified'}
+- Ideal customer: ${p.idealCustomer || 'not specified'}
+- They sell via: ${sellVia}
+- Monthly marketing budget: ${p.marketingBudget || 'not specified'}
+- Their top goals this month: ${goals}
+- Biggest marketing challenge: ${p.marketingChallenge || 'not specified'}
+- Content comfort: ${p.contentComfort || 'not specified'}
+- Competitors to watch: ${watchList}
+- Website: ${p.websiteUrl || 'not provided'}
+- Instagram: ${p.instagramHandle ? `@${p.instagramHandle}` : 'not provided'}
 
-You sound like a smart friend who happens to be a marketing expert — not a chatbot, not a consultant, not a template generator.
+HOW YOU OPEN:
+Your very first response should demonstrate you already know their business. Reference something specific — their goal, their challenge, their budget. Make them feel like you've been thinking about their business.
 
-The business you are currently helping: ${profile.companyName || 'this business'}, business type: ${profile.businessType || 'small business'}.`
+Bad opening: "What kind of business do you run?"
+Good opening: "Okay — you want to launch a product and build your email list this month. With a $200–$500 budget, here's where I'd start: tell me about the product you're launching."
 
-  const stream = await client.messages.stream({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: messages.map(m => ({
-      role: m.role,
-      content: m.content,
-    })),
-  })
+RESPONSE LENGTH — THIS IS CRITICAL:
+In conversation: maximum 3 sentences. Then stop. Never output more than 4 sentences before pausing.
 
-  const encoder = new TextEncoder()
+WHEN TO ORCHESTRATE — after 4–6 meaningful exchanges when you have enough context:
+Say exactly: "Got everything I need. I'm spinning up the Campaign Builder now — it'll have your full 30-day plan ready in about a minute."
+This exact phrasing triggers the Campaign Builder agent. Use it only when you genuinely have enough to build a real plan.
 
-  const readable = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const event of stream) {
-          if (
-            event.type === 'content_block_delta' &&
-            event.delta.type === 'text_delta'
-          ) {
-            const token = event.delta.text
-            controller.enqueue(encoder.encode(`data: ${token}\n\n`))
-          }
-        }
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-        controller.close()
-      } catch (err) {
-        controller.error(err)
-      }
-    },
-  })
+HOW YOU HANDLE COMPETITORS:
+Reference competitors from what you know when relevant.
 
-  return new Response(readable, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  })
+PERSONALITY:
+Direct. Warm. A little energetic. Never say "Great!" or "Absolutely!" Just respond and move.
+Never use markdown in conversational replies. Save structure for the plan only.`
+
+  return runAgent({ agent: 'maya', system, messages })
 }
