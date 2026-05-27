@@ -1,3 +1,11 @@
+## REPO IDENTITY — READ FIRST
+This is the PRODUCTION app.
+GitHub: rovaneD/agent7even-app
+Vercel: app.agent7even.com
+The experimental v2 lives at rovaneD/agent7even-v2 — never mix them.
+
+---
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
