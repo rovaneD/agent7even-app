@@ -6,11 +6,5 @@
   },
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/run-scheduled-agents",
-      "schedule": "0 * * * *"
-    }
-  ]
+  "framework": "nextjs"
 }

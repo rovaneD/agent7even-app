@@ -1,97 +1,93 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useUser, SignOutButton } from '@clerk/nextjs'
+import { useUser } from '@clerk/nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check, Loader2 } from 'lucide-react'
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
-interface Answers {
-  company_name: string
-  business_type: string
-  ideal_customer: string
-  website_url: string
-  instagram_handle: string
-  sell_locations: string[]
-  marketing_budget: string
-  competitors: string[]
-  top_goals: string[]
-  marketing_challenge: string
-  content_comfort: string
+type StepType = 'text' | 'select' | 'multiselect' | 'done'
+
+interface Step {
+  id: string
+  question: string
+  subtext?: string
+  type: StepType
+  placeholder?: string
+  options?: { value: string; label: string; emoji: string }[]
+  field: string
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// ── Steps ────────────────────────────────────────────────────────────────────
 
-const INDUSTRY_SUGGESTIONS = [
-  'Skincare', 'Clothing boutique', 'Restaurant', 'Fitness studio',
-  'Photography', 'Real estate', 'Coaching', 'E-commerce', 'Beauty salon',
-  'Food & beverage', 'Jewelry', 'Interior design', 'Health & wellness',
-  'Pet care', 'Marketing agency', 'Consulting', 'Hair salon', 'Bakery',
-  'Online course', 'Wedding planner',
+const STEPS: Step[] = [
+  {
+    id: 'company_name',
+    question: "First things first — what's the name of your business?",
+    subtext: "This is how we'll refer to you throughout your dashboard.",
+    type: 'text',
+    placeholder: 'e.g. Bloom Skincare',
+    field: 'company_name',
+  },
+  {
+    id: 'business_type',
+    question: "What kind of business is it?",
+    subtext: "This helps us tailor your tools and recommendations.",
+    type: 'select',
+    field: 'business_type',
+    options: [
+      { value: 'ecommerce', label: 'E-commerce / Online store', emoji: '🛍️' },
+      { value: 'service', label: 'Service business', emoji: '🤝' },
+      { value: 'restaurant', label: 'Restaurant / Food & Beverage', emoji: '🍽️' },
+      { value: 'retail', label: 'Brick & mortar retail', emoji: '🏪' },
+      { value: 'creative', label: 'Creative / Studio', emoji: '🎨' },
+      { value: 'health', label: 'Health & Wellness', emoji: '💪' },
+      { value: 'other', label: 'Something else', emoji: '✨' },
+    ],
+  },
+  {
+    id: 'business_goals',
+    question: "What are you trying to get better at?",
+    subtext: "Pick everything that applies — no wrong answers.",
+    type: 'multiselect',
+    field: 'business_goals',
+    options: [
+      { value: 'save_time', label: 'Save time on repetitive tasks', emoji: '⏱️' },
+      { value: 'grow_social', label: 'Grow on social media', emoji: '📱' },
+      { value: 'get_leads', label: 'Get more leads and customers', emoji: '🎯' },
+      { value: 'build_website', label: 'Build or improve my website', emoji: '💻' },
+      { value: 'run_ads', label: 'Run better ads', emoji: '📣' },
+      { value: 'create_content', label: 'Create more content consistently', emoji: '✍️' },
+      { value: 'email_marketing', label: 'Set up email marketing', emoji: '✉️' },
+      { value: 'brand_identity', label: 'Build a stronger brand', emoji: '🎨' },
+    ],
+  },
+  {
+    id: 'website_url',
+    question: "Do you have a website?",
+    subtext: "Paste the URL if you do — skip if not yet.",
+    type: 'text',
+    placeholder: 'https://yourbusiness.com',
+    field: 'website_url',
+  },
+  {
+    id: 'instagram_handle',
+    question: "What's your Instagram handle?",
+    subtext: "We'll use this to connect your analytics later.",
+    type: 'text',
+    placeholder: '@yourbusiness',
+    field: 'instagram_handle',
+  },
+  {
+    id: 'done',
+    question: '',
+    type: 'done',
+    field: '',
+  },
 ]
 
-const SELL_LOCATIONS = [
-  'My website', 'Instagram / DMs', 'Physical store', 'Amazon / Etsy', 'Not selling yet',
-]
-
-const BUDGET_OPTIONS = [
-  'Under $200', '$200–$500', '$500–$1,500', '$1,500–$5,000', '$5,000+',
-]
-
-const GOAL_OPTIONS = [
-  'Get more followers', 'Drive website traffic', 'Launch a new product',
-  'Build an email list', 'Run my first ad campaign', 'Post more consistently',
-  'Improve my brand', 'Get more reviews', 'Something else',
-]
-
-const CHALLENGE_OPTIONS = [
-  "Not enough time", "Don't know what to post", "Tried agencies — didn't work",
-  "No budget", "Don't know if it's working", "Just getting started",
-]
-
-const CONTENT_COMFORT_OPTIONS = [
-  { value: 'confident', label: 'I post regularly and know what I\'m doing' },
-  { value: 'inconsistent', label: 'I post sometimes but feel inconsistent' },
-  { value: 'unsure', label: 'I rarely post — not sure where to start' },
-  { value: 'no_camera', label: "I don't want to be on camera at all" },
-]
-
-const TOTAL_STEPS = 5
-
-// ── Shared UI ──────────────────────────────────────────────────────────────
-
-function Pill({
-  label, selected, onClick, disabled,
-}: { label: string; selected: boolean; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 rounded-full text-sm border transition-all ${
-        selected
-          ? 'border-[#c8522a]/60 bg-[#c8522a]/15 text-white'
-          : 'border-white/10 bg-white/5 text-white/60 hover:border-white/25 hover:text-white/80'
-      } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      {label}
-    </button>
-  )
-}
-
-function ContinueBtn({ onClick, disabled, label = 'Continue' }: { onClick: () => void; disabled?: boolean; label?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex items-center gap-2 bg-[#c8522a] text-white text-sm font-medium px-6 py-3 rounded-xl disabled:opacity-30 hover:bg-[#b04623] transition-colors mt-6"
-    >
-      {label} <ArrowRight size={14} />
-    </button>
-  )
-}
-
-// ── Main ───────────────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
 function OnboardingInner() {
   const { user } = useUser()
@@ -99,167 +95,132 @@ function OnboardingInner() {
   const searchParams = useSearchParams()
   const plan = searchParams.get('plan')
 
-  const [step, setStep] = useState(0)
-  const [saving, setSaving] = useState(false)
-  const [showReveal, setShowReveal] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
+  const [inputValue, setInputValue] = useState('')
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([])
+  const [isTyping, setIsTyping] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [displayedQuestion, setDisplayedQuestion] = useState('')
+  const [showInput, setShowInput] = useState(false)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Step 1
-  const [companyName, setCompanyName] = useState('')
-  const [businessType, setBusinessType] = useState('')
-  const [industrySuggestions, setIndustrySuggestions] = useState<string[]>([])
-  const [idealCustomer, setIdealCustomer] = useState('')
+  const step = STEPS[currentStep]
+  const progress = ((currentStep) / (STEPS.length - 1)) * 100
 
-  // Step 2
-  const [websiteUrl, setWebsiteUrl] = useState('')
-  const [instagramHandle, setInstagramHandle] = useState('')
-  const [sellLocations, setSellLocations] = useState<string[]>([])
-  const [marketingBudget, setMarketingBudget] = useState('')
-
-  // Step 3
-  const [competitor1, setCompetitor1] = useState('')
-  const [competitor2, setCompetitor2] = useState('')
-  const [competitor3, setCompetitor3] = useState('')
-
-  // Step 4
-  const [topGoals, setTopGoals] = useState<string[]>([])
-  const [marketingChallenge, setMarketingChallenge] = useState('')
-
-  // Step 5
-  const [contentComfort, setContentComfort] = useState('')
-
-  const nameRef = useRef<HTMLInputElement>(null)
-
-  // Pre-fill from Clerk
+  // Typing animation effect
   useEffect(() => {
-    if (user?.fullName) setCompanyName(user.fullName)
-  }, [user])
-
-  // Industry type-ahead
-  useEffect(() => {
-    if (!businessType.trim()) { setIndustrySuggestions([]); return }
-    const q = businessType.toLowerCase()
-    setIndustrySuggestions(
-      INDUSTRY_SUGGESTIONS.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q).slice(0, 5)
-    )
-  }, [businessType])
-
-  useEffect(() => {
-    if (step === 0) setTimeout(() => nameRef.current?.focus(), 300)
-  }, [step])
-
-  function toggleSellLocation(val: string) {
-    setSellLocations(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])
-  }
-
-  function toggleGoal(val: string) {
-    setTopGoals(prev =>
-      prev.includes(val)
-        ? prev.filter(v => v !== val)
-        : prev.length < 3 ? [...prev, val] : prev
-    )
-  }
-
-  async function handleSubmit() {
-    setSaving(true)
-    const competitors = [competitor1, competitor2, competitor3].map(c => c.trim().replace(/^@/, '')).filter(Boolean)
-    const answers: Answers = {
-      company_name: companyName.trim(),
-      business_type: businessType.trim(),
-      ideal_customer: idealCustomer.trim(),
-      website_url: websiteUrl.trim(),
-      instagram_handle: instagramHandle.trim().replace(/^@/, ''),
-      sell_locations: sellLocations,
-      marketing_budget: marketingBudget,
-      competitors,
-      top_goals: topGoals,
-      marketing_challenge: marketingChallenge,
-      content_comfort: contentComfort,
+    if (step.type === 'done') {
+      handleSubmit()
+      return
     }
 
-    try {
-      await fetch('/api/onboarding/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...answers, clerk_user_id: user?.id }),
-      })
-    } catch { /* continue to reveal regardless */ }
+    setIsTyping(true)
+    setShowInput(false)
+    setDisplayedQuestion('')
+    setInputValue('')
+    setSelectedOptions([])
 
-    setSaving(false)
-    setShowReveal(true)
+    const question = step.question
+    let i = 0
+    const speed = 28
+
+    const timer = setInterval(() => {
+      if (i < question.length) {
+        setDisplayedQuestion(question.slice(0, i + 1))
+        i++
+      } else {
+        clearInterval(timer)
+        setIsTyping(false)
+        setTimeout(() => setShowInput(true), 200)
+      }
+    }, speed)
+
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep])
+
+  useEffect(() => {
+    if (showInput && step.type === 'text') {
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [showInput, step.type])
+
+  const handleNext = (value?: string | string[]) => {
+    const finalValue = value ?? (step.type === 'multiselect' ? selectedOptions : inputValue)
+
+    if (step.type === 'text' && !inputValue.trim() && step.id !== 'website_url' && step.id !== 'instagram_handle') {
+      return
+    }
+
+    setAnswers(prev => ({ ...prev, [step.field]: finalValue ?? '' }))
+    setCompletedSteps(prev => [...prev, currentStep])
+    setCurrentStep(prev => prev + 1)
   }
 
-  function goNext() { setStep(s => s + 1) }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleNext()
+    }
+  }
 
-  const progress = ((step) / TOTAL_STEPS) * 100
-
-  // ── Reveal screen ──────────────────────────────────────────────────────────
-
-  if (showReveal) {
-    const competitors = [competitor1, competitor2, competitor3].filter(Boolean)
-    const bullets = [
-      businessType ? `${companyName || 'Your business'} · ${businessType}` : companyName,
-      topGoals.length ? `Goals: ${topGoals.slice(0, 2).join(', ')}` : null,
-      competitors.length ? `Watching: ${competitors.map(c => `@${c.replace(/^@/, '')}`).join(', ')}` : null,
-      idealCustomer ? `Customer: ${idealCustomer.slice(0, 60)}${idealCustomer.length > 60 ? '…' : ''}` : null,
-    ].filter(Boolean) as string[]
-
-    return (
-      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center px-8">
-        <div className="max-w-md w-full text-center">
-          {/* Maya avatar */}
-          <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6">
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
-              <span className="text-[#0d0d0d] text-xl font-bold">M</span>
-            </div>
-          </div>
-
-          <p className="text-white/40 text-xs uppercase tracking-widest mb-3">Ready</p>
-          <h2 className="text-white text-2xl font-medium mb-2 tracking-tight">Maya has reviewed your profile.</h2>
-          <p className="text-white/40 text-sm mb-8">Here's what she's working with:</p>
-
-          <div className="text-left bg-white/3 border border-white/8 rounded-2xl p-5 mb-8 flex flex-col gap-3">
-            {bullets.map((b, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="w-4 h-4 rounded-full bg-[#c8522a]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check size={9} className="text-[#c8522a]" />
-                </div>
-                <p className="text-white/80 text-sm leading-relaxed">{b}</p>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => router.push(plan ? `/checkout-now?plan=${plan}` : '/maya')}
-            className="w-full flex items-center justify-center gap-2 bg-white text-[#0d0d0d] text-sm font-semibold px-6 py-4 rounded-xl hover:bg-white/90 transition-colors"
-          >
-            Let's build your first campaign <ArrowRight size={15} />
-          </button>
-        </div>
-      </div>
+  const toggleOption = (value: string) => {
+    setSelectedOptions(prev =>
+      prev.includes(value)
+        ? prev.filter(v => v !== value)
+        : [...prev, value]
     )
   }
 
-  // ── Loading state ──────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
+    try {
+      const res = await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...answers,
+          clerk_user_id: user?.id,
+        }),
+      })
 
-  if (saving) {
+      if (!res.ok) throw new Error('Failed to save')
+      router.push(plan ? `/checkout-now?plan=${plan}` : '/dashboard')
+    } catch (err) {
+      console.error(err)
+      router.push('/dashboard')
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  if (step.type === 'done' || isSubmitting) {
     return (
       <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-2 h-2 rounded-full bg-[#c8522a] animate-pulse mx-auto mb-4" />
-          <p className="text-white/40 text-sm">Setting up Maya...</p>
+          <div className="w-16 h-16 rounded-full bg-[#c8522a]/10 border border-[#c8522a]/20 flex items-center justify-center mx-auto mb-6">
+            {isSubmitting
+              ? <Loader2 size={24} className="text-[#c8522a] animate-spin" />
+              : <Check size={24} className="text-[#c8522a]" />
+            }
+          </div>
+          <p className="text-white/50 text-sm">Setting up your workspace...</p>
         </div>
       </div>
     )
   }
-
-  // ── Step screens ───────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-[#0d0d0d] flex flex-col">
 
-      {/* Progress */}
+      {/* Progress bar */}
       <div className="w-full h-0.5 bg-white/5">
-        <div className="h-full bg-[#c8522a] transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+        <div
+          className="h-full bg-[#c8522a] transition-all duration-700 ease-out"
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
       {/* Header */}
@@ -267,244 +228,156 @@ function OnboardingInner() {
         <span className="text-white font-bold text-sm tracking-wide">
           AGENT<span className="text-[#c8522a]">7</span>EVEN
         </span>
-        <div className="flex items-center gap-5">
-          <span className="text-white/20 text-xs">{step + 1} of {TOTAL_STEPS}</span>
-          <SignOutButton redirectUrl="/sign-in">
-            <button className="text-white/30 hover:text-white/60 text-xs transition-colors">Sign out</button>
-          </SignOutButton>
-        </div>
+        <span className="text-white/20 text-xs">
+          {currentStep + 1} of {STEPS.length - 1}
+        </span>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col justify-center max-w-xl mx-auto w-full px-8 pb-16">
+      {/* Main conversation area */}
+      <div className="flex-1 flex flex-col justify-center max-w-2xl mx-auto w-full px-8 pb-24">
 
-        {/* ── STEP 1: Business identity ── */}
-        {step === 0 && (
-          <div className="animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <p className="text-white/30 text-xs uppercase tracking-widest mb-3">Step 1 · Business</p>
-            <h2 className="text-white text-2xl font-medium mb-8 leading-snug tracking-tight">
-              Let's start with your business.
-            </h2>
-
-            <div className="flex flex-col gap-5">
-              <div>
-                <label className="text-white/40 text-xs uppercase tracking-widest mb-2 block">Business name</label>
-                <input
-                  ref={nameRef}
-                  value={companyName}
-                  onChange={e => setCompanyName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && companyName.trim() && nameRef.current?.blur()}
-                  placeholder="e.g. Bloom Skincare"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="text-white/40 text-xs uppercase tracking-widest mb-2 block">Industry</label>
-                <input
-                  value={businessType}
-                  onChange={e => setBusinessType(e.target.value)}
-                  placeholder="e.g. Skincare, Restaurant, Coaching..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
-                />
-                {industrySuggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {industrySuggestions.map(s => (
-                      <button
-                        key={s}
-                        onClick={() => { setBusinessType(s); setIndustrySuggestions([]) }}
-                        className="px-3 py-1 rounded-full text-xs border border-white/10 bg-white/5 text-white/50 hover:border-[#c8522a]/40 hover:text-white/80 transition-all"
-                      >
-                        {s}
-                      </button>
-                    ))}
+        {/* Completed steps summary */}
+        {completedSteps.length > 0 && (
+          <div className="mb-12 flex flex-col gap-3">
+            {completedSteps.map((stepIndex) => {
+              const s = STEPS[stepIndex]
+              const answer = answers[s.field]
+              if (!answer || (Array.isArray(answer) && answer.length === 0)) return null
+              return (
+                <div key={s.id} className="flex items-start gap-3 opacity-40">
+                  <div className="w-5 h-5 rounded-full bg-[#c8522a]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Check size={10} className="text-[#c8522a]" />
                   </div>
+                  <div>
+                    <p className="text-white/50 text-xs mb-0.5">{s.question}</p>
+                    <p className="text-white text-sm font-medium">
+                      {Array.isArray(answer) ? answer.join(', ') : answer}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Current question */}
+        <div className="mb-8">
+          <div className="flex items-start gap-3 mb-2">
+            <div className="w-8 h-8 rounded-full bg-[#c8522a] flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-white text-xs font-bold">A7</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-white text-xl leading-relaxed font-medium min-h-[2rem]">
+                {displayedQuestion}
+                {isTyping && (
+                  <span className="inline-block w-0.5 h-5 bg-[#c8522a] ml-0.5 animate-pulse" />
                 )}
-              </div>
+              </p>
+              {!isTyping && step.subtext && (
+                <p className="text-white/40 text-sm mt-2 animate-in fade-in duration-300">
+                  {step.subtext}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
-              <div>
-                <label className="text-white/40 text-xs uppercase tracking-widest mb-2 block">Ideal customer</label>
+        {/* Input area */}
+        {showInput && (
+          <div className="ml-11 animate-in slide-in-from-bottom-2 fade-in duration-300">
+
+            {/* Text input */}
+            {step.type === 'text' && (
+              <div className="flex gap-3">
                 <input
-                  value={idealCustomer}
-                  onChange={e => setIdealCustomer(e.target.value)}
-                  placeholder="e.g. Women 35–50 dealing with hormonal skin changes"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={e => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={step.placeholder}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
                 />
+                <button
+                  onClick={() => handleNext()}
+                  disabled={!inputValue.trim() && step.id !== 'website_url' && step.id !== 'instagram_handle'}
+                  className="w-11 h-11 rounded-xl bg-[#c8522a] flex items-center justify-center disabled:opacity-30 hover:bg-[#b04623] transition-colors flex-shrink-0"
+                >
+                  <ArrowRight size={16} className="text-white" />
+                </button>
               </div>
-            </div>
+            )}
 
-            <ContinueBtn onClick={goNext} disabled={!companyName.trim() || !businessType.trim()} />
-          </div>
-        )}
+            {/* Skip link for optional fields */}
+            {step.type === 'text' && (step.id === 'website_url' || step.id === 'instagram_handle') && (
+              <button
+                onClick={() => handleNext('')}
+                className="mt-3 text-white/30 text-xs hover:text-white/50 transition-colors"
+              >
+                Skip for now →
+              </button>
+            )}
 
-        {/* ── STEP 2: Where they are now ── */}
-        {step === 1 && (
-          <div className="animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <p className="text-white/30 text-xs uppercase tracking-widest mb-3">Step 2 · Your presence</p>
-            <h2 className="text-white text-2xl font-medium mb-8 leading-snug tracking-tight">
-              Where are you right now?
-            </h2>
-
-            <div className="flex flex-col gap-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-white/40 text-xs uppercase tracking-widest mb-2 block">Website (optional)</label>
-                  <input
-                    value={websiteUrl}
-                    onChange={e => setWebsiteUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-white/40 text-xs uppercase tracking-widest mb-2 block">Instagram (optional)</label>
-                  <input
-                    value={instagramHandle}
-                    onChange={e => setInstagramHandle(e.target.value)}
-                    placeholder="@yourbusiness"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-white/40 text-xs uppercase tracking-widest mb-3 block">Where do you sell?</label>
-                <div className="flex flex-wrap gap-2">
-                  {SELL_LOCATIONS.map(loc => (
-                    <Pill key={loc} label={loc} selected={sellLocations.includes(loc)} onClick={() => toggleSellLocation(loc)} />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-white/40 text-xs uppercase tracking-widest mb-3 block">Monthly marketing budget</label>
-                <div className="flex flex-wrap gap-2">
-                  {BUDGET_OPTIONS.map(b => (
-                    <Pill key={b} label={b} selected={marketingBudget === b} onClick={() => setMarketingBudget(b)} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <ContinueBtn onClick={goNext} disabled={sellLocations.length === 0 || !marketingBudget} />
-          </div>
-        )}
-
-        {/* ── STEP 3: Competitors ── */}
-        {step === 2 && (
-          <div className="animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <p className="text-white/30 text-xs uppercase tracking-widest mb-3">Step 3 · Competition</p>
-            <h2 className="text-white text-2xl font-medium mb-2 leading-snug tracking-tight">
-              Who are your main competitors?
-            </h2>
-            <p className="text-white/40 text-sm mb-8">Add up to 3 Instagram handles or business names. Maya will keep an eye on them.</p>
-
-            <div className="flex flex-col gap-3">
-              {[
-                { val: competitor1, set: setCompetitor1 },
-                { val: competitor2, set: setCompetitor2 },
-                { val: competitor3, set: setCompetitor3 },
-              ].map((c, i) => (
-                <input
-                  key={i}
-                  value={c.val}
-                  onChange={e => c.set(e.target.value)}
-                  placeholder="@competitor"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none focus:border-[#c8522a]/50 transition-colors"
-                />
-              ))}
-            </div>
-
-            <p className="text-white/25 text-xs mt-4">
-              Not sure? Skip this — Maya will suggest competitors based on your industry.
-            </p>
-
-            <ContinueBtn onClick={goNext} label="Continue" />
-          </div>
-        )}
-
-        {/* ── STEP 4: Goals and challenges ── */}
-        {step === 3 && (
-          <div className="animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <p className="text-white/30 text-xs uppercase tracking-widest mb-3">Step 4 · Priorities</p>
-            <h2 className="text-white text-2xl font-medium mb-2 leading-snug tracking-tight">
-              What are you focused on?
-            </h2>
-            <p className="text-white/40 text-sm mb-6">Pick up to 3 priorities for the next 30 days.</p>
-
-            <div className="flex flex-wrap gap-2 mb-8">
-              {GOAL_OPTIONS.map(g => (
-                <Pill
-                  key={g} label={g}
-                  selected={topGoals.includes(g)}
-                  onClick={() => toggleGoal(g)}
-                  disabled={topGoals.length >= 3 && !topGoals.includes(g)}
-                />
-              ))}
-            </div>
-
-            <div>
-              <p className="text-white/40 text-sm mb-3">What's been hardest about marketing so far?</p>
-              <div className="flex flex-col gap-2">
-                {CHALLENGE_OPTIONS.map(c => (
+            {/* Single select */}
+            {step.type === 'select' && (
+              <div className="grid grid-cols-1 gap-2">
+                {step.options?.map(option => (
                   <button
-                    key={c}
-                    onClick={() => setMarketingChallenge(c)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left text-sm transition-all ${
-                      marketingChallenge === c
-                        ? 'border-[#c8522a]/60 bg-[#c8522a]/10 text-white'
-                        : 'border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white/80'
-                    }`}
+                    key={option.value}
+                    onClick={() => handleNext(option.value)}
+                    className="flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-left hover:border-[#c8522a]/50 hover:bg-white/8 transition-all group"
                   >
-                    {marketingChallenge === c && <Check size={13} className="text-[#c8522a] flex-shrink-0" />}
-                    {c}
+                    <span className="text-lg">{option.emoji}</span>
+                    <span className="text-white/80 text-sm group-hover:text-white transition-colors">
+                      {option.label}
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
+            )}
 
-            <ContinueBtn onClick={goNext} disabled={topGoals.length === 0 || !marketingChallenge} />
-          </div>
-        )}
-
-        {/* ── STEP 5: Content comfort ── */}
-        {step === 4 && (
-          <div className="animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <p className="text-white/30 text-xs uppercase tracking-widest mb-3">Step 5 · Content</p>
-            <h2 className="text-white text-2xl font-medium mb-2 leading-snug tracking-tight">
-              How comfortable are you creating content?
-            </h2>
-            <p className="text-white/40 text-sm mb-8">This helps Maya calibrate what to suggest for you.</p>
-
-            <div className="flex flex-col gap-2">
-              {CONTENT_COMFORT_OPTIONS.map(opt => (
+            {/* Multi select */}
+            {step.type === 'multiselect' && (
+              <div>
+                <div className="grid grid-cols-1 gap-2 mb-4">
+                  {step.options?.map(option => {
+                    const selected = selectedOptions.includes(option.value)
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => toggleOption(option.value)}
+                        className={`flex items-center gap-3 px-4 py-3 border rounded-xl text-left transition-all ${
+                          selected
+                            ? 'border-[#c8522a]/60 bg-[#c8522a]/10'
+                            : 'border-white/10 bg-white/5 hover:border-white/20'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all ${
+                          selected ? 'bg-[#c8522a]' : 'border border-white/20'
+                        }`}>
+                          {selected && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className="text-lg">{option.emoji}</span>
+                        <span className={`text-sm transition-colors ${selected ? 'text-white' : 'text-white/70'}`}>
+                          {option.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
                 <button
-                  key={opt.value}
-                  onClick={() => setContentComfort(opt.value)}
-                  className={`flex items-center gap-3 px-4 py-4 rounded-xl border text-left text-sm transition-all ${
-                    contentComfort === opt.value
-                      ? 'border-[#c8522a]/60 bg-[#c8522a]/10 text-white'
-                      : 'border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white/80'
-                  }`}
+                  onClick={() => handleNext(selectedOptions)}
+                  disabled={selectedOptions.length === 0}
+                  className="flex items-center gap-2 bg-[#c8522a] text-white text-sm font-medium px-6 py-3 rounded-xl disabled:opacity-30 hover:bg-[#b04623] transition-colors"
                 >
-                  <div className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-all ${
-                    contentComfort === opt.value ? 'border-[#c8522a] bg-[#c8522a]' : 'border-white/20'
-                  }`}>
-                    {contentComfort === opt.value && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
-                  {opt.label}
+                  Continue
+                  <ArrowRight size={14} />
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
 
-            <ContinueBtn
-              onClick={handleSubmit}
-              disabled={!contentComfort}
-              label="Meet Maya"
-            />
           </div>
         )}
-
       </div>
     </div>
   )

@@ -58,25 +58,6 @@ export default async function DashboardPage() {
 
       {hasPlan && <PlanBanner plan={profile.plan} />}
 
-      {/* Maya entry point */}
-      <Link
-        href="/maya"
-        className="block mb-6 rounded-2xl border border-gray-100 bg-white p-5 hover:border-gray-300 transition-colors group"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-[#0a0a0a] flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-lg font-semibold">M</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 mb-0.5">Talk to Maya</p>
-            <p className="text-xs text-gray-400 leading-relaxed">Your AI marketing strategist — get a plan, create content, and act on it, all in one place.</p>
-          </div>
-          <div className="flex-shrink-0 flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-[#0a0a0a] transition-colors">
-            Open <ArrowRight size={12} />
-          </div>
-        </div>
-      </Link>
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Hours reclaimed', value: '—', sub: 'This month', icon: Clock, color: 'text-[#c8522a]', bg: 'bg-[#c8522a]/8' },
