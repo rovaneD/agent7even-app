@@ -25,8 +25,6 @@ export default async function DashboardPage() {
     .eq('clerk_user_id', userId)
     .single()
 
-  console.error('[dashboard-diag]', JSON.stringify({ userId, onboarding_complete: profile?.onboarding_complete, role: profile?.role, profileFound: !!profile }))
-
   if (['owner', 'admin'].includes(profile?.role)) {
     redirect('/admin')
   }

@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
 
     const { error } = await supabase
       .from('profiles')
-      .update({
+      .upsert({
+        clerk_user_id,
         company_name: company_name || null,
         business_type: business_type || null,
         business_goals: business_goals || [],
@@ -29,12 +30,12 @@ export async function POST(req: NextRequest) {
         instagram_handle: instagram_handle || null,
         onboarding_complete: true,
         status: 'active',
+        role: 'client',
         updated_at: new Date().toISOString(),
-      })
-      .eq('clerk_user_id', clerk_user_id)
+      }, { onConflict: 'clerk_user_id' })
 
     if (error) {
-      console.error('Supabase update error:', error)
+      console.error('Onboarding upsert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
