@@ -48,18 +48,40 @@ export async function POST(req: Request) {
     const email = email_addresses?.[0]?.email_address ?? ''
     const fullName = [first_name, last_name].filter(Boolean).join(' ')
 
-    const { data: newProfile, error } = await supabase.from('profiles').upsert({
-      clerk_user_id: id,
-      email,
-      full_name: fullName,
-      avatar_url: image_url ?? '',
-      role: 'client',
-      status: 'onboarding',
-      onboarding_complete: false,
-    }, { onConflict: 'clerk_user_id' }).select('id').single()
+    // Check if profile already exists (Clerk retries user.created on failed deliveries)
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('clerk_user_id', id)
+      .single()
 
-    if (error) {
-      console.error('Supabase upsert error (user.created):', error)
+    let newProfile: { id: string } | null = null
+
+    if (!existing) {
+      const { data, error } = await supabase.from('profiles').insert({
+        clerk_user_id: id,
+        email,
+        full_name: fullName,
+        avatar_url: image_url ?? '',
+        role: 'client',
+        status: 'onboarding',
+        onboarding_complete: false,
+      }).select('id').single()
+
+      if (error) {
+        console.error('Supabase insert error (user.created):', error)
+      } else {
+        newProfile = data
+      }
+    } else {
+      // Profile exists — only update contact fields, never reset onboarding state
+      await supabase.from('profiles').update({
+        email,
+        full_name: fullName,
+        avatar_url: image_url ?? '',
+        updated_at: new Date().toISOString(),
+      }).eq('clerk_user_id', id)
+      newProfile = existing
     }
 
     // Activate any pending team invite for this email
